@@ -69,14 +69,20 @@ describe("hook dispatch — codex mode", () => {
     assert.ok(event.agentId.startsWith("codex:"));
   });
 
-  test("unmapped codex event (pre-compact) writes nothing, exits 0", () => {
+  test("codex pre-compact maps to session.activity (v4 §28c), exits 0", () => {
     const fixture = readFileSync(
       join(FIXTURES, "codex", "pre-compact-SYNTHETIC.json"),
       "utf8"
     );
     const { result, lines } = runHook({ args: ["codex"], input: fixture });
     assert.equal(result.status, 0);
-    assert.equal(lines.length, 0);
+    assert.equal(lines.length, 1);
+    const event = JSON.parse(lines[0]);
+    assert.equal(event.source, "codex");
+    assert.equal(event.kind, "session.activity");
+    assert.equal(event.tool, "compact");
+    assert.equal(event.hint, "pre");
+    assert.ok(event.sessionId.startsWith("codex:"));
   });
 });
 

@@ -1,0 +1,9 @@
+{
+  "hook_event_name": "PostCompact",
+  "cwd": "/home/user/project",
+  "model": "gpt-5.5",
+  "session_id": "019f0000-aaaa-7000-8000-000000000001",
+  "transcript_path": "/home/user/.codex/sessions/2026/07/17/rollout-2026-07-17T00-00-00-019f0000.jsonl",
+  "turn_id": "019f0000-bbbb-7000-8000-000000000002",
+  "trigger": "auto"
+}

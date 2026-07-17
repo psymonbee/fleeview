@@ -24,12 +24,18 @@ function hasAgentId(payload) {
   return payload.agent_id !== undefined && payload.agent_id !== null;
 }
 
+// Shared hint/file derivation for agent.activity and session.activity (§18.3,
+// §25). `Skill` gets its own case (§26): the skill name is the useful
+// signal, not its args.
 function activityBasics(payload) {
   const input = payload.tool_input && typeof payload.tool_input === "object" ? payload.tool_input : {};
-  const hint = truncate(
-    input.description || input.command || input.file_path || input.prompt || "",
-    120
-  );
+  const hint =
+    payload.tool_name === "Skill"
+      ? truncate(input.skill ?? "", 120)
+      : truncate(
+          input.description || input.command || input.file_path || input.prompt || "",
+          120
+        );
   const file = input.file_path ?? input.notebook_path;
   return { hint, file };
 }
@@ -77,8 +83,14 @@ export function translate(payload, now = new Date()) {
           },
         ];
       case "PreToolUse": {
-        if (!hasAgentId(payload)) return []; // main-loop calls not rendered (§18.3)
         const { hint, file } = activityBasics(payload);
+        // §25: main-loop calls (no agent_id) become session.activity so the
+        // hub isn't dead pre-plan — parity with the claude-code adapter.
+        if (!hasAgentId(payload)) {
+          const event = { ...base, kind: "session.activity", tool: payload.tool_name, hint };
+          if (file !== undefined && file !== null) event.file = file;
+          return [event];
+        }
         const event = {
           ...base,
           kind: "agent.activity",
@@ -104,8 +116,23 @@ export function translate(payload, now = new Date()) {
           },
         ];
       }
-      // PermissionRequest (no tool_use_id, likely never fires in exec mode)
-      // and Pre/PostCompact are deliberately unmapped in v3 (§18.3).
+      // §28c / §25: closes §18.3's previously-unmapped rows. PermissionRequest
+      // has no tool_use_id (and likely never fires in exec mode) so it can't
+      // be an agent.activity — it becomes a session-level activity line
+      // naming the tool the permission is for.
+      case "PermissionRequest":
+        return [
+          {
+            ...base,
+            kind: "session.activity",
+            tool: "permission",
+            hint: truncate(payload.tool_name ?? "", 120),
+          },
+        ];
+      case "PreCompact":
+        return [{ ...base, kind: "session.activity", tool: "compact", hint: "pre" }];
+      case "PostCompact":
+        return [{ ...base, kind: "session.activity", tool: "compact", hint: "post" }];
       default:
         return [];
     }

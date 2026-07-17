@@ -132,16 +132,41 @@ describe("codex adapter mapping (§18.3)", () => {
     assert.equal(event.callId, "call_0001");
   });
 
-  test("main-loop pre-tool-use (no agent_id) -> []", () => {
-    assert.deepEqual(translate(loadFixture("pre-tool-use-mainloop-SYNTHETIC.json")), []);
+  test("main-loop pre-tool-use (no agent_id) -> session.activity (§25 parity, was [] in v3)", () => {
+    const events = translate(loadFixture("pre-tool-use-mainloop-SYNTHETIC.json"));
+    assert.equal(events.length, 1);
+    const [event] = events;
+    assert.equal(event.kind, "session.activity");
+    assert.equal(event.tool, "shell");
+    assert.equal(event.hint, "ls");
+    assert.equal(event.sessionId, "codex:019f0000-aaaa-7000-8000-000000000001");
   });
 
-  test("permission-request -> [] (unmapped in v3)", () => {
-    assert.deepEqual(translate(loadFixture("permission-request-SYNTHETIC.json")), []);
+  test("permission-request -> session.activity {tool:'permission', hint: tool_name} (§28c)", () => {
+    const events = translate(loadFixture("permission-request-SYNTHETIC.json"));
+    assert.equal(events.length, 1);
+    const [event] = events;
+    assert.equal(event.kind, "session.activity");
+    assert.equal(event.tool, "permission");
+    assert.equal(event.hint, "shell");
   });
 
-  test("pre-compact -> [] (unmapped in v3)", () => {
-    assert.deepEqual(translate(loadFixture("pre-compact-SYNTHETIC.json")), []);
+  test("pre-compact -> session.activity {tool:'compact', hint:'pre'} (§28c)", () => {
+    const events = translate(loadFixture("pre-compact-SYNTHETIC.json"));
+    assert.equal(events.length, 1);
+    const [event] = events;
+    assert.equal(event.kind, "session.activity");
+    assert.equal(event.tool, "compact");
+    assert.equal(event.hint, "pre");
+  });
+
+  test("post-compact -> session.activity {tool:'compact', hint:'post'} (§28c)", () => {
+    const events = translate(loadFixture("post-compact-SYNTHETIC.json"));
+    assert.equal(events.length, 1);
+    const [event] = events;
+    assert.equal(event.kind, "session.activity");
+    assert.equal(event.tool, "compact");
+    assert.equal(event.hint, "post");
   });
 });
 

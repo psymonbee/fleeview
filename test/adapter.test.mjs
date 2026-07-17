@@ -204,7 +204,7 @@ describe("adapters/claude-code.mjs — edge cases", () => {
     );
   });
 
-  test("PreToolUse Read without agent_id -> []", () => {
+  test("PreToolUse Read without agent_id -> session.activity (§25, was [] pre-v4)", () => {
     const payload = {
       session_id: "s1",
       hook_event_name: "PreToolUse",
@@ -212,7 +212,13 @@ describe("adapters/claude-code.mjs — edge cases", () => {
       tool_input: { file_path: "/tmp/foo.txt" },
       tool_use_id: "toolu_x",
     };
-    assert.deepEqual(translate(payload), []);
+    const events = translate(payload);
+    assert.equal(events.length, 1);
+    const [event] = events;
+    assert.equal(event.kind, "session.activity");
+    assert.equal(event.tool, "Read");
+    assert.equal(event.hint, "/tmp/foo.txt");
+    assert.equal(event.file, "/tmp/foo.txt");
   });
 
   test("PostToolUse Agent without agent_id and without tool_response.agentId (sync spawn completing) -> []", () => {
@@ -477,5 +483,155 @@ describe("v3 subject backfill — subagent task tools also emit plan.step (§20)
     const events = translate(payload);
     assert.equal(events.length, 1);
     assert.equal(events[0].kind, "agent.activity");
+  });
+});
+
+describe("§24 nested-spawn lineage (live captures, test/fixtures/nested-*.json)", () => {
+  test("nested-pre-agent-spawn.json -> [agent.activity start, fuzzy spawn-pending with parentAgentId, no agentId]", () => {
+    const events = translate(loadFixture("nested-pre-agent-spawn.json"));
+    assert.equal(events.length, 2);
+
+    const [activity, spawnPending] = events;
+    assert.equal(activity.kind, "agent.activity");
+    assert.equal(activity.phase, "start");
+    assert.equal(activity.agentId, "ac87ff2ff3d145aad");
+    assert.equal(activity.tool, "Agent");
+    assert.equal(activity.callId, "toolu_011e3CYvK9MoZyXPfrFoU4hE");
+    assert.equal(activity.hint, "Read note.txt");
+
+    assert.equal(spawnPending.kind, "agent.spawn-pending");
+    assert.equal(spawnPending.agentType, "general-purpose");
+    assert.equal(spawnPending.description, "Read note.txt");
+    assert.equal(spawnPending.parentAgentId, "ac87ff2ff3d145aad");
+    assert.equal(spawnPending.agentId, undefined, "fuzzy claim has no child agentId yet");
+  });
+
+  test("nested-post-agent-spawn.json -> [agent.activity end, exact spawn-pending with agentId+parentAgentId+model]", () => {
+    const events = translate(loadFixture("nested-post-agent-spawn.json"));
+    assert.equal(events.length, 2);
+
+    const [activity, spawnPending] = events;
+    assert.equal(activity.kind, "agent.activity");
+    assert.equal(activity.phase, "end");
+    assert.equal(activity.agentId, "ac87ff2ff3d145aad");
+    assert.equal(activity.tool, "Agent");
+    assert.equal(activity.ms, 7306);
+
+    assert.equal(spawnPending.kind, "agent.spawn-pending");
+    assert.equal(spawnPending.agentId, "a035ab21c1995b9cd");
+    assert.equal(spawnPending.parentAgentId, "ac87ff2ff3d145aad");
+    assert.equal(spawnPending.agentType, "general-purpose");
+    assert.equal(spawnPending.description, "Read note.txt");
+    assert.equal(spawnPending.model, "claude-opus-4-8[1m]");
+  });
+
+  test("nested-subagent-start.json -> plain agent.start (no parent field on the payload)", () => {
+    const events = translate(loadFixture("nested-subagent-start.json"));
+    assert.equal(events.length, 1);
+    const [event] = events;
+    assert.equal(event.kind, "agent.start");
+    assert.equal(event.agentId, "a035ab21c1995b9cd");
+    assert.equal(event.agentType, "general-purpose");
+    assert.equal(event.parentAgentId, undefined);
+  });
+
+  test("nested-subagent-stop.json -> agent.end with finalMessage + transcriptPath", () => {
+    const events = translate(loadFixture("nested-subagent-stop.json"));
+    assert.equal(events.length, 1);
+    const [event] = events;
+    assert.equal(event.kind, "agent.end");
+    assert.equal(event.agentId, "a035ab21c1995b9cd");
+    assert.equal(event.agentType, "general-purpose");
+    assert.equal(event.finalMessage, "The exact contents of note.txt:\n\n```\nnested-ok\n```");
+    assert.equal(
+      event.transcriptPath,
+      "/Users/simon/.claude/projects/-Users-simon-nested-probe/2ae08aee-7038-49f8-80d0-9c4d4ad4d346/subagents/agent-a035ab21c1995b9cd.jsonl"
+    );
+  });
+});
+
+describe("§25 session.activity — pre-plan orchestrator", () => {
+  test("main-loop Read Pre (no agent_id) -> exactly one session.activity", () => {
+    const payload = {
+      session_id: "s1",
+      hook_event_name: "PreToolUse",
+      tool_name: "Read",
+      tool_input: { file_path: "/tmp/mainloop-read.txt" },
+      tool_use_id: "toolu_mainloop_read",
+    };
+    const events = translate(payload);
+    assert.equal(events.length, 1);
+    const [event] = events;
+    assert.equal(event.kind, "session.activity");
+    assert.equal(event.tool, "Read");
+    assert.equal(event.hint, "/tmp/mainloop-read.txt");
+    assert.equal(event.file, "/tmp/mainloop-read.txt");
+  });
+
+  test("main-loop Agent Pre (no agent_id) -> spawn-pending only, no session.activity", () => {
+    const payload = {
+      session_id: "s1",
+      hook_event_name: "PreToolUse",
+      tool_name: "Agent",
+      tool_input: { description: "Spawn a worker", subagent_type: "builder" },
+    };
+    const events = translate(payload);
+    assert.equal(events.length, 1);
+    assert.equal(events[0].kind, "agent.spawn-pending");
+    assert.ok(
+      events.every((e) => e.kind !== "session.activity"),
+      "no session.activity alongside a top-level spawn-pending"
+    );
+  });
+
+  test("main-loop plain Post (no agent_id) -> []", () => {
+    const payload = {
+      session_id: "s1",
+      hook_event_name: "PostToolUse",
+      tool_name: "Read",
+      tool_input: { file_path: "/tmp/mainloop-read.txt" },
+      tool_response: { content: "hi" },
+      tool_use_id: "toolu_mainloop_read",
+      duration_ms: 3,
+    };
+    assert.deepEqual(translate(payload), []);
+  });
+
+  test("main-loop TaskCreate Pre stays excluded (unmapped, not session.activity)", () => {
+    const events = translate(loadFixture("pre-taskcreate.json"));
+    assert.deepEqual(events, []);
+  });
+});
+
+describe("§26 Skill hint", () => {
+  test("Skill Pre with agent_id -> agent.activity hint = skill name", () => {
+    const payload = {
+      session_id: "s1",
+      agent_id: "a1",
+      hook_event_name: "PreToolUse",
+      tool_name: "Skill",
+      tool_input: { skill: "verify", args: "run the checks" },
+      tool_use_id: "toolu_skill1",
+    };
+    const events = translate(payload);
+    assert.equal(events.length, 1);
+    const [event] = events;
+    assert.equal(event.kind, "agent.activity");
+    assert.equal(event.tool, "Skill");
+    assert.equal(event.hint, "verify");
+  });
+
+  test("Skill Pre without agent_id -> session.activity hint = skill name", () => {
+    const payload = {
+      session_id: "s1",
+      hook_event_name: "PreToolUse",
+      tool_name: "Skill",
+      tool_input: { skill: "deep-research", args: "topic" },
+    };
+    const events = translate(payload);
+    assert.equal(events.length, 1);
+    const [event] = events;
+    assert.equal(event.kind, "session.activity");
+    assert.equal(event.hint, "deep-research");
   });
 });

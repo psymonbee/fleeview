@@ -24,6 +24,21 @@ function hasAgentId(payload) {
   return payload.agent_id !== undefined && payload.agent_id !== null;
 }
 
+// Shared hint/file derivation for agent.activity and session.activity (§9,
+// §25). `Skill` gets its own case (§26): the skill name is the useful
+// signal, not its args.
+function activityBasics(toolName, input) {
+  const hint =
+    toolName === "Skill"
+      ? truncate(input.skill ?? "", 120)
+      : truncate(
+          input.description || input.command || input.file_path || input.prompt || "",
+          120
+        );
+  const file = input.file_path ?? input.notebook_path;
+  return { hint, file };
+}
+
 // Task lists are session-shared, so plan.step events are emitted for
 // TaskUpdate/TaskCreate wherever they happen — main loop or inside a
 // subagent (§20: the agent_id branch previously swallowed the subject).
@@ -85,11 +100,7 @@ function translatePreToolUse(payload, base) {
   }
 
   if (hasAgentId(payload)) {
-    const hint = truncate(
-      input.description || input.command || input.file_path || input.prompt || "",
-      120
-    );
-    const file = input.file_path ?? input.notebook_path;
+    const { hint, file } = activityBasics(toolName, input);
     const event = {
       ...base,
       kind: "agent.activity",
@@ -100,6 +111,22 @@ function translatePreToolUse(payload, base) {
       hint,
     };
     if (file !== undefined && file !== null) event.file = file;
+
+    // §24: a nested Agent/Task spawn (fired from inside a running subagent)
+    // links to its parent via the parent's own agent_id — fuzzy claim, no
+    // child agentId exists yet.
+    if (toolName === "Agent" || toolName === "Task") {
+      return [
+        event,
+        {
+          ...base,
+          kind: "agent.spawn-pending",
+          agentType: input.subagent_type ?? "claude",
+          description: truncate(input.description ?? "", 300),
+          parentAgentId: payload.agent_id,
+        },
+      ];
+    }
     if (toolName === "TaskUpdate") return [event, ...taskUpdateStep(input, base)];
     return [event];
   }
@@ -125,7 +152,16 @@ function translatePreToolUse(payload, base) {
     return [{ ...base, kind: "plan.doc", markdown: truncate(input.plan, 4000) }];
   }
 
-  return [];
+  // §25: TaskCreate stays excluded (its Pre side is unmapped, see §9) — every
+  // other main-loop tool call (no agent_id, not Agent/Task/mcp__codex__/
+  // TaskUpdate/ExitPlanMode, all handled above) becomes session.activity so
+  // the hub isn't dead between session.start and the first spawn.
+  if (toolName === "TaskCreate") return [];
+
+  const { hint, file } = activityBasics(toolName, input);
+  const event = { ...base, kind: "session.activity", tool: toolName, hint };
+  if (file !== undefined && file !== null) event.file = file;
+  return [event];
 }
 
 function translatePostToolUse(payload, base) {
@@ -160,6 +196,30 @@ function translatePostToolUse(payload, base) {
       tool: toolName,
       ms: payload.duration_ms,
     };
+
+    // §24: the parent's PostToolUse is the authoritative repair for a nested
+    // spawn — it carries both the parent's agent_id (top-level) and the
+    // child's id (tool_response.agentId), often arriving after the child's
+    // own SubagentStop. No tool_response.agentId (sync spawn already fully
+    // resolved) -> activity only.
+    if (toolName === "Agent" || toolName === "Task") {
+      const responseAgentId =
+        response && typeof response === "object" ? response.agentId : undefined;
+      if (responseAgentId === undefined || responseAgentId === null) return [event];
+      return [
+        event,
+        {
+          ...base,
+          kind: "agent.spawn-pending",
+          agentId: responseAgentId,
+          parentAgentId: payload.agent_id,
+          agentType: input.subagent_type ?? "claude",
+          description: truncate(input.description ?? "", 300),
+          model: response.resolvedModel,
+        },
+      ];
+    }
+
     if (toolName === "TaskCreate") return [event, ...taskCreateStep(input, response, base)];
     return [event];
   }
