@@ -1,5 +1,9 @@
 # FleetView v4 — session bootstrap
 
+> **Superseded 2026-07-17 — v4 shipped.** Start new sessions from
+> `docs/V5-BOOTSTRAP.md`. Kept for the v3-era empirical-facts list it
+> preserves.
+
 Point a fresh Claude Code session at this file to start v4 with full context.
 Repo: `/Users/simon/lumenADE` · GitHub: https://github.com/psymonbee/fleeview
 (This file superseded the v3 bootstrap on 2026-07-17; v3 shipped the same day.)

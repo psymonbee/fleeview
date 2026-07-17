@@ -15,6 +15,16 @@ stall and error states derived from activity gaps, per-agent final messages, a
 click-to-open drawer with the live tool-call log, and a token/est.-cost badge
 on every card and on the session itself.
 
+Your own agents render without any configuration: FleetView captures at the
+harness level, so whatever agent types your session spawns become cards, and
+their display metadata (label, model, provider accent) is **auto-discovered**
+from `~/.claude/agents` and the project's `.claude/agents` frontmatter. When a
+subagent spawns its own subagent, the child card indents under its parent with
+a parent-to-child edge — the canvas is a tree, not a hub-and-spokes. Before
+the first agent exists, the hub shows what the orchestrator itself is doing
+(reading, searching, running commands), and cards grow skill/MCP capability
+chips as agents use them.
+
 ![FleetView](docs/media/fleetview.gif)
 <!-- capture TBD -->
 
@@ -52,8 +62,19 @@ npm start
 
 `--dev <path>` wires the hooks at that checkout instead of vendoring, so
 repo edits take effect without reinstalling. Other flags: `--yes` (skip the
-confirmation prompt), `--with-codex` (wire the experimental Codex hooks
-too), `--start` (launch the server once installed), `--uninstall` (below).
+confirmation prompt), `--with-agents` (below), `--with-codex` (wire the
+experimental Codex hooks too), `--start` (launch the server once
+installed), `--uninstall` (below).
+
+### No orchestration yet? `--with-agents`
+
+If you don't have agent definitions of your own, `--with-agents` installs a
+starter fleet into `~/.claude/agents`: **builder** (implements a
+well-specified step), **checker** (verifies the builder's work), and
+**codex-runner** (relays a task to the OpenAI Codex CLI — harmless if you
+don't have `codex` installed; it simply never gets spawned). Files you
+already have are never overwritten (`skipped (exists)` is printed), and
+`--uninstall` leaves them in place — once written, they're yours.
 
 ## Architecture
 
@@ -70,7 +91,7 @@ adapters/claude-code.mjs    stateless translator, [] on anything unrecognized
 ~/.lumenade/events.jsonl    versioned, harness-neutral JSONL log
         │  tailed incrementally
         ▼
-server/server.mjs           reducer + SSE :4747 + GET /agents/:id/log
+server/server.mjs           reducer + SSE :4747 + GET /agents/:id/log, /sessions/:id/log
         │  EventSource
         ▼
 public/index.html           single-file UI — hub, agent cards, plan rail, drawer
@@ -79,7 +100,10 @@ public/index.html           single-file UI — hub, agent cards, plan rail, draw
 Supporting a new harness means writing another adapter emitting the same
 neutral schema — log format, server, and UI don't change.
 `FLEET_EVENTS_FILE` overrides the events-log path (hook and server);
-`PORT` overrides the server port (default `4747`).
+`PORT` overrides the server port (default `4747`). Note the events log
+grows unbounded (v4's orchestrator-activity capture adds roughly one line
+per main-loop tool call) — it's a plain JSONL file; truncate or rotate it
+whenever you like, the server just re-tails.
 
 ### What the installer writes
 
@@ -113,10 +137,20 @@ and still boots. Keys:
 
 - `hub.title` — orchestrator hub title shown in the UI (default
   `"Orchestrator"`).
-- `agents` — per-agentType `{ label, model, provider }`. `provider` is
-  `"anthropic"` or `"openai"` and drives the card accent color and brand
-  chip. Ships with `builder`, `checker`, `codex-runner`, `codex-direct`.
-- `fallbackAgent` — `{ model, provider }` used for unknown agent types.
+- `agents` — per-agentType `{ label, model, provider }` **overrides**.
+  `provider` is `"anthropic"` or `"openai"` and drives the card accent
+  color and brand chip. You rarely need this now: agent metadata is
+  auto-discovered from `~/.claude/agents/*.md` (scanned at server boot)
+  and `<session cwd>/.claude/agents/*.md` (scanned when a session starts;
+  project beats user-level) — the frontmatter `name`, `description`, and
+  `model` fields drive the card. An explicit `agents` entry in this file
+  always beats discovery. Ships with just the two Codex entries
+  (`codex-runner`, `codex-direct`).
+- `modelAliases` — maps frontmatter model aliases to canonical ids before
+  pretty-naming (`sonnet` → `claude-sonnet-5`, etc.); `inherit` and
+  unknown aliases pass through.
+- `fallbackAgent` — `{ model, provider }` used for unknown agent types
+  (Codex-namespaced sessions fall back to the `openai` provider).
 - `modelNames` — pretty display names for raw model ids (exact match, else
   longest-prefix match after stripping a trailing date suffix, else the raw
   id). A model reported on an event wins over the per-agentType default.

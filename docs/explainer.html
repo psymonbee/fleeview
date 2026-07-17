@@ -289,21 +289,23 @@
     <p class="muted" style="margin-top:18px">The config dial lives in <span class="file">fleet.config.json</span> — rename an agent, change what counts as "stalled", tweak the token price list, or set <span class="file">narration.enabled</span> to true to hear the commentator.</p>
     <p style="margin-top:18px"><strong>To set it up on another Mac</strong> (new in v3, once the repo is public): one command does the whole move-in, and the same command with <span class="file">--uninstall</span> undoes it.</p>
     <p class="kbd-line">npx github:psymonbee/fleeview</p>
+    <p style="margin-top:18px"><strong>No agents of your own yet?</strong> (new in v4) — add <span class="file">--with-agents</span> and the installer also drops a starter crew into <span class="file">~/.claude/agents</span>: a builder, a checker, and a Codex relay. It never overwrites files you already have, and uninstalling leaves them with you.</p>
   </section>
 
   <!-- ─────────────────────────── SLIDE 7 ─────────────────────────── -->
   <section class="slide">
     <p class="eyebrow">Slide 7 · Proof &amp; what's next</p>
-    <h2>v3 shipped — what landed, and what's honest about it</h2>
-    <p><strong>Everything in the v3 scope landed:</strong> token counts and an estimated cost on every card (with the full in/out/cache breakdown in the drawer and a session total on the hub), the one-command installer, the Codex translator, and the public-facing README. The cost figures come from adding up each agent's own transcript on your Mac — verified to the exact token against an independent hand-count of a real session.</p>
-    <p><strong>One honest asterisk on Codex:</strong> its hook system turned out to be locked behind its plugin mechanism — installing one is a change to <em>your</em> Codex account setup, so the fleet never did it for you. Instead, the translator was built against the payload blueprints inside the Codex program itself, the installer prepares the plugin folder, and it prints the two commands for you to run if and when you want Codex agents on screen. Until then Codex support is labelled experimental.</p>
-    <p><strong>The proof:</strong> 106 automated tests all green, a full dress rehearsal through the real pipeline (demo, Codex events, and a plan step created by a subagent — the old "(untitled step)" bug is fixed), a live browser inspection of every new screen element, and the same self-filming trick as v2: this very build ran with FleetView's own capture live.</p>
-    <p><strong>Waiting on you</strong> (the two steps only you can do): flip the repo to public on GitHub, then run the installer once for real. Your v4 ideas from today — usage limits on screen, skills/servers per card, showing the "getting oriented" phase before a plan exists — are parked in the bootstrap file, not lost.</p>
+    <h2>v4 shipped — built for people who aren't you</h2>
+    <p><strong>The shift:</strong> v3 was your window onto your fleet; v4 makes it work for strangers. If someone already has their own agents, FleetView now reads their agent files and dresses every card correctly — right name, right model, right colour — with zero configuration. If they have nothing, <span class="file">--with-agents</span> hands them a starter crew. Either way, the watching part never needed their setup to match yours: that was the point all along.</p>
+    <p><strong>The canvas grew up too:</strong> when an agent hires its own helper, the helper's card now tucks in underneath with a line drawn from its parent — a family tree, not spokes on a wheel. Before any agents exist, the hub narrates what the orchestrator itself is doing (the "getting oriented" phase you asked for), and cards sprout little badges showing which skills and outside tools each agent is using.</p>
+    <p><strong>One honest cut:</strong> your top ask — usage limits on screen — turned out to have no data behind it: Claude Code simply doesn't write your remaining-allowance anywhere FleetView can read. Rather than show a made-up number, it's parked for v5 with the evidence written down, so nobody wastes a day rediscovering that.</p>
+    <p><strong>The proof:</strong> 150 automated tests green, and the flagship check was live: a real agent spawned a real child during the build, and the family-tree edge drew itself on this very canvas while the child was still working. The nested-spawn behaviour wasn't guessed — it was probed with real hook captures first, same as the Codex work in v3.</p>
     <div class="pills">
       <span class="pill"><span class="dot green"></span>v1 · built 16 July</span>
       <span class="pill"><span class="dot green"></span>v2 · built &amp; shipped 17 July</span>
       <span class="pill"><span class="dot green"></span>v3 · built &amp; shipped 17 July</span>
-      <span class="pill"><span class="dot teal"></span>v4 · ideas parked</span>
+      <span class="pill"><span class="dot green"></span>v4 · built &amp; shipped 17 July</span>
+      <span class="pill"><span class="dot teal"></span>v5 · ideas parked</span>
     </div>
   </section>
 
