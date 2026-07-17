@@ -1,123 +1,189 @@
-# LumenADE · Fleet view
+# FleetView
 
-FleetView is a live, n8n/make.com-style visualization of Claude Code
-agent-fleet activity: an orchestrator hub with agent nodes branching off it,
-each pulsing while it works and checking off when it's done. Alongside the
-graph it renders a plan rail, files-touched chips (with a collision warning
-when two running agents touch the same file), stall and error states, per-agent
-final messages, and a click-to-open drawer with the agent's live activity log.
-It turns the otherwise invisible fan-out of subagents (builders, checkers,
-Codex relays, ...) into something you can watch happen in real time.
+FleetView is a live, n8n/make.com-style canvas for Claude Code agent-fleet
+activity. Claude Code hooks forward raw payloads to a thin observer, a
+stateless adapter normalizes them into a versioned, harness-neutral event
+schema, a zero-dependency Node server tails the resulting log and streams
+state over Server-Sent Events, and a single self-contained HTML file renders
+it. No build step, no framework, no external requests, nothing leaves your
+machine.
 
-Under the hood, harness events are normalized into a versioned,
-**harness-neutral event schema** (`docs/FLEETVIEW-SPEC.md` §8). A thin capture
-hook forwards each raw Claude Code payload to a stateless, per-harness
-**adapter** (`adapters/claude-code.mjs`), which does all the filtering and
-truncation and emits neutral event lines into a local JSONL log. A
-zero-dependency Node server tails that log, reduces it into sessions, agent
-runs, and plans, and streams state to a single-file browser UI over
-Server-Sent Events. Supporting a new harness means writing another adapter —
-the schema, server, and UI stay unchanged. Nothing leaves your machine: the
-log, the server, and the UI are all local.
+Point it at a running Claude Code session and watch the orchestrator hub spawn
+agent cards in real time: a plan rail tracking task-list steps, a files-touched
+chip row with a collision warning when two running agents edit the same file,
+stall and error states derived from activity gaps, per-agent final messages, a
+click-to-open drawer with the live tool-call log, and a token/est.-cost badge
+on every card and on the session itself.
+
+![FleetView](docs/media/fleetview.gif)
+<!-- capture TBD -->
 
 ## Quickstart
 
 ```sh
+npx github:psymonbee/fleeview
+```
+
+This clones the repo, vendors it to `~/.lumenade/app`, and merges the eight
+hook entries below into `~/.claude/settings.json` (backing up the existing
+file first). Requires `git` on your `PATH` — `npx github:` installs by
+cloning, not from the npm registry.
+
+```sh
+node ~/.lumenade/app/server/server.mjs
+```
+
+Open **http://localhost:4747** — with no events yet you'll see an idle hub.
+To see it move without a real session, run the bundled demo from the
+vendored app:
+
+```sh
+cd ~/.lumenade/app && npm run demo -- --fast
+```
+
+**Manual install**, working from a checkout instead of the vendored copy:
+
+```sh
+git clone https://github.com/psymonbee/fleeview.git
+cd fleeview
+node bin/install.mjs --dev "$(pwd)"
 npm start
 ```
 
-Then open **http://localhost:4747**. With no events file yet, you'll see an
-idle hub and an empty-state message. To see it move without wiring up real
-hooks, run the bundled demo in another terminal:
+`--dev <path>` wires the hooks at that checkout instead of vendoring, so
+repo edits take effect without reinstalling. Other flags: `--yes` (skip the
+confirmation prompt), `--with-codex` (wire the experimental Codex hooks
+too), `--start` (launch the server once installed), `--uninstall` (below).
 
-```sh
-npm run demo
+## Architecture
+
+```
+Claude Code hooks (8 events)
+        │  stdin JSON
+        ▼
+hooks/emit-event.mjs        thin observer — always exit 0, never blocks a tool call
+        │
+        ▼
+adapters/claude-code.mjs    stateless translator, [] on anything unrecognized
+        │  neutral events {v, source, t, kind, sessionId, ...}
+        ▼
+~/.lumenade/events.jsonl    versioned, harness-neutral JSONL log
+        │  tailed incrementally
+        ▼
+server/server.mjs           reducer + SSE :4747 + GET /agents/:id/log
+        │  EventSource
+        ▼
+public/index.html           single-file UI — hub, agent cards, plan rail, drawer
 ```
 
-This replays a scripted ~60 s orchestration — a builder, a Codex relay, a
-stalled agent, a null-id `codex-direct` pair, a four-step plan, a file
-collision, and an error-then-recovery — as neutral events into the log, which
-the running server picks up and streams to any open browser tab. Pass
-`-- --fast` to skip the sleeps and replay instantly:
+Supporting a new harness means writing another adapter emitting the same
+neutral schema — log format, server, and UI don't change.
+`FLEET_EVENTS_FILE` overrides the events-log path (hook and server);
+`PORT` overrides the server port (default `4747`).
 
-```sh
-npm run demo -- --fast
-```
+### What the installer writes
 
-## Wiring up real capture
-
-FleetView only sees activity that Claude Code tells it about via hooks. Add the
-following to your `~/.claude/settings.json` (merge into any existing `"hooks"`
-block rather than replacing it). All eight events point at the same script:
+The installer merges this shape into `~/.claude/settings.json`, once per
+event, deduping its own entries on re-run rather than duplicating them:
 
 ```json
 {
   "hooks": {
-    "SessionStart":     [ { "hooks": [{ "type": "command", "command": "node /Users/simon/lumenADE/hooks/emit-event.mjs" }] } ],
-    "SessionEnd":       [ { "hooks": [{ "type": "command", "command": "node /Users/simon/lumenADE/hooks/emit-event.mjs" }] } ],
-    "UserPromptSubmit": [ { "hooks": [{ "type": "command", "command": "node /Users/simon/lumenADE/hooks/emit-event.mjs" }] } ],
-    "Stop":             [ { "hooks": [{ "type": "command", "command": "node /Users/simon/lumenADE/hooks/emit-event.mjs" }] } ],
-    "SubagentStart":    [ { "hooks": [{ "type": "command", "command": "node /Users/simon/lumenADE/hooks/emit-event.mjs" }] } ],
-    "SubagentStop":     [ { "hooks": [{ "type": "command", "command": "node /Users/simon/lumenADE/hooks/emit-event.mjs" }] } ],
-    "PreToolUse":       [ { "matcher": "", "hooks": [{ "type": "command", "command": "node /Users/simon/lumenADE/hooks/emit-event.mjs" }] } ],
-    "PostToolUse":      [ { "matcher": "", "hooks": [{ "type": "command", "command": "node /Users/simon/lumenADE/hooks/emit-event.mjs" }] } ]
+    "SessionStart":     [ { "hooks": [{ "type": "command", "command": "node <install path>/hooks/emit-event.mjs", "timeout": 5 }] } ],
+    "SessionEnd":       [ { "hooks": [{ "type": "command", "command": "node <install path>/hooks/emit-event.mjs", "timeout": 5 }] } ],
+    "UserPromptSubmit": [ { "hooks": [{ "type": "command", "command": "node <install path>/hooks/emit-event.mjs", "timeout": 5 }] } ],
+    "Stop":             [ { "hooks": [{ "type": "command", "command": "node <install path>/hooks/emit-event.mjs", "timeout": 5 }] } ],
+    "SubagentStart":    [ { "hooks": [{ "type": "command", "command": "node <install path>/hooks/emit-event.mjs", "timeout": 5 }] } ],
+    "SubagentStop":     [ { "hooks": [{ "type": "command", "command": "node <install path>/hooks/emit-event.mjs", "timeout": 5 }] } ],
+    "PreToolUse":       [ { "matcher": ".*", "hooks": [{ "type": "command", "command": "node <install path>/hooks/emit-event.mjs", "timeout": 5 }] } ],
+    "PostToolUse":      [ { "matcher": ".*", "hooks": [{ "type": "command", "command": "node <install path>/hooks/emit-event.mjs", "timeout": 5 }] } ]
   }
 }
 ```
 
-The script (`hooks/emit-event.mjs`) is a pure observer: it reads the payload
-Claude Code sends on stdin, hands it to the adapter (which does all filtering
-and truncation), appends any resulting neutral event lines to
-`~/.lumenade/events.jsonl`, and always exits `0` — it never blocks or fails a
-real tool call. It writes nothing when `FLEET_IGNORE=1` is set in its
-environment; this is the self-observation guard the narrator uses so FleetView
-never watches itself.
-
-Override the events-file location for both the hook and the server with
-`FLEET_EVENTS_FILE`, and the server's port with `PORT` (default `4747`).
-
-This runs on **every** hooked event across every Claude Code session on the
-machine, so `server/server.mjs` should normally be running to consume the log
-— otherwise `~/.lumenade/events.jsonl` just quietly grows.
+`<install path>` is `~/.lumenade/app` normally, or your checkout for
+`--dev`. Everything else already in `settings.json` is left untouched; a
+timestamped backup is written before every merge.
 
 ## Configuration — `fleet.config.json`
 
-The server loads `fleet.config.json` (repo root) at boot and shallow-merges it
-over built-in defaults; a missing or corrupt file falls back to defaults and
-still boots. Keys:
+The server loads `fleet.config.json` (repo root) at boot and shallow-merges
+it over built-in defaults; a missing or corrupt file falls back to defaults
+and still boots. Keys:
 
 - `hub.title` — orchestrator hub title shown in the UI (default
   `"Orchestrator"`).
 - `agents` — per-agentType `{ label, model, provider }`. `provider` is
-  `"anthropic"` or `"openai"` and drives the card accent color and brand chip.
-  Ships with `builder`, `checker`, `codex-runner`, and `codex-direct`.
+  `"anthropic"` or `"openai"` and drives the card accent color and brand
+  chip. Ships with `builder`, `checker`, `codex-runner`, `codex-direct`.
 - `fallbackAgent` — `{ model, provider }` used for unknown agent types.
 - `modelNames` — pretty display names for raw model ids (exact match, else
   longest-prefix match after stripping a trailing date suffix, else the raw
   id). A model reported on an event wins over the per-agentType default.
-- `stallThresholdMs` — how long a running agent may go without activity before
-  the UI marks it stalled (default `120000`).
-- `narration` — optional Haiku narration sidecar, **off by default**:
-  `{ "enabled": false, "model": "haiku", "debounceMs": 15000, "minNewLines": 3, "maxConcurrent": 1, "timeoutMs": 30000 }`.
-  When `enabled`, the server periodically spawns `claude -p --model <model>` to
-  summarize a running agent's recent activity into one sentence. Those spawns
-  run with `FLEET_IGNORE=1`, so their own hook events are ignored and FleetView
-  never narrates itself.
+- `stallThresholdMs` — how long a running agent may go without activity
+  before the UI marks it stalled (default `120000`).
+- `narration` — optional Haiku narration sidecar, **off by default**. When
+  enabled the server periodically spawns `claude -p --model <model>` to
+  summarize a running agent's recent activity in one sentence, with
+  `FLEET_IGNORE=1` set so FleetView never narrates itself.
+- `enrichment` — token/cost sidecar, **on by default**: `{ enabled,
+  intervalMs, pricing }`. `pricing` maps a model id to USD-per-million-token
+  rates:
 
-## Events file
+  | model | in | out | cache read | cache write |
+  |---|---|---|---|---|
+  | Claude Fable 5 | $10.00 | $50.00 | $1.00 | $12.50 |
+  | Claude Opus 4.8 | $5.00 | $25.00 | $0.50 | $6.25 |
+  | Claude Sonnet 5 | $3.00 | $15.00 | $0.30 | $3.75 |
+  | Claude Haiku 4.5 | $1.00 | $5.00 | $0.10 | $1.25 |
 
-Neutral event lines (one JSON object per line, envelope `"v": 1`) are appended
-to `~/.lumenade/events.jsonl` by default, overridable via `FLEET_EVENTS_FILE`
-for both the hook and the server. Lines that fail to parse, carry a different
-schema version, or use an unknown kind are silently skipped by the reducer — so
-the old pre-v2 `~/.claude/fleet/` log is abandoned rather than migrated.
+  All figures are estimates: cache writes are priced at the 5-minute cache
+  rate (transcripts don't distinguish 5-minute from 1-hour writes), and
+  Sonnet 5 also carries $2/$10 intro pricing through 2026-08-31, not
+  reflected above. Edit `enrichment.pricing` as rates change — a
+  user-supplied `enrichment` block replaces the default wholesale, not a
+  key-by-key merge.
 
-## Removing it
+## Token / cost per node
 
-1. Delete the eight `hooks` entries above from `~/.claude/settings.json` (or
-   the whole `"hooks"` block if FleetView was the only thing using it).
-2. Delete the events log and its directory: `rm -rf ~/.lumenade`.
-3. Optionally remove the abandoned v1 log: `rm -rf ~/.claude/fleet`.
-4. Optionally remove this repo.
+Running agent cards show a compact token badge next to the model pill; the
+drawer expands it into an input / output / cache-read / cache-write
+breakdown plus an estimated dollar cost. A local sidecar
+(`server/enrich.mjs`) tails each agent's own transcript file incrementally —
+a bounded read per tick, never the whole file — and dedupes by message id,
+since transcripts repeat an assistant line once per content block and only
+the last occurrence carries the true token count. Cost is recomputed from
+the pricing table above on every change. Nothing leaves the machine: the
+sidecar only reads transcript files Claude Code already writes to disk.
 
-No other state is written anywhere else on the machine.
+## Codex CLI (experimental)
+
+FleetView ships an adapter for the Codex CLI (`adapters/codex.mjs`) that
+maps Codex's hook events onto the same neutral schema, with every id
+namespaced `codex:<raw id>` so a concurrent Codex session and Claude Code
+session in the same events log never collide. Wire it with:
+
+```sh
+npx github:psymonbee/fleeview --with-codex
+```
+
+The field mapping was verified against real captured Codex hook payloads,
+not assumed (`docs/FLEETVIEW-SPEC.md` §18). Codex has no
+Stop/SessionEnd/UserPromptSubmit-equivalent hook, so turn-active state is
+best-effort and the hub just doesn't pulse for Codex sessions — spawns,
+activity, files, and tokens all render the same as a Claude Code fleet.
+This path is newer and less exercised; expect rough edges.
+
+## Removal
+
+```sh
+npx github:psymonbee/fleeview --uninstall
+rm -rf ~/.lumenade
+```
+
+The first removes the eight hook entries the installer added from
+`~/.claude/settings.json`, leaving every other hook and setting untouched;
+the second deletes the vendored app and the events log. Settings backups
+from every install/uninstall are left under
+`~/.claude/settings.json.fleetview-backup-<timestamp>` for you to inspect or
+restore from. No other state is written anywhere on the machine.

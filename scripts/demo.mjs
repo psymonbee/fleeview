@@ -56,6 +56,10 @@ function describe(evt) {
       }${evt.error ? " ERROR" : ""}`;
     case "agent.end":
       return `agent.end ${evt.agentId ?? "(null)"} [${evt.agentType ?? ""}]`;
+    case "agent.usage":
+      return `usage ${evt.agentId ?? "(session)"} in=${evt.tokens.in} out=${evt.tokens.out}${
+        evt.costUsd != null ? ` est.$${evt.costUsd.toFixed(4)}` : ""
+      }`;
     case "plan.step":
       return `plan.step ${evt.stepId}${evt.status ? " -> " + evt.status : ""}`;
     case "plan.doc":
@@ -124,6 +128,14 @@ async function main() {
   emit("agent.activity", { agentId: "demo-b1", phase: "end", callId: cid, tool: "Write", ms: 4000 });
   await sleep(600);
 
+  // usage beat 1 — early, small numbers
+  emit("agent.usage", {
+    agentId: "demo-b1",
+    tokens: { in: 2000, out: 10000, cacheRead: 150000, cacheWrite: 8000 },
+    costUsd: 0.231,
+  });
+  await sleep(400);
+
   // pair 2 — sanity check
   cid = nextCallId("demo-b1");
   emit("agent.activity", {
@@ -150,6 +162,14 @@ async function main() {
   await sleep(3200);
   emit("agent.activity", { agentId: "demo-b1", phase: "end", callId: cid, tool: "Edit", ms: 3200 });
   await sleep(600);
+
+  // usage beat 2 — rising
+  emit("agent.usage", {
+    agentId: "demo-b1",
+    tokens: { in: 2800, out: 35000, cacheRead: 300000, cacheWrite: 13000 },
+    costUsd: 0.6722,
+  });
+  await sleep(400);
 
   // ---- 3. codex lane spawns via the fuzzy-claim path (in parallel) ------
   emit("agent.spawn-pending", { agentType: "codex-runner", description: "Build fleet canvas UI" });
@@ -204,6 +224,14 @@ async function main() {
   emit("agent.activity", { agentId: "demo-b1", phase: "end", callId: cid, tool: "Bash", ms: 1400 });
   await sleep(900);
 
+  // usage beat 3 — rising further, past the recovery
+  emit("agent.usage", {
+    agentId: "demo-b1",
+    tokens: { in: 3400, out: 65000, cacheRead: 450000, cacheWrite: 17000 },
+    costUsd: 1.184,
+  });
+  await sleep(400);
+
   // second codex activity
   cid = nextCallId("demo-c1");
   emit("agent.activity", {
@@ -216,6 +244,16 @@ async function main() {
   await sleep(3800);
   emit("agent.activity", { agentId: "demo-c1", phase: "end", callId: cid, tool: "Bash", ms: 3800 });
   await sleep(800);
+
+  // demo-c1's one usage beat — OpenAI Codex has no entry in the Anthropic
+  // pricing table, so a real enricher would report tokens with a null cost;
+  // mirror that here rather than fabricating a rate.
+  emit("agent.usage", {
+    agentId: "demo-c1",
+    tokens: { in: 1500, out: 4200, cacheRead: 0, cacheWrite: 0 },
+    costUsd: null,
+  });
+  await sleep(400);
 
   // ---- 4. a stalled agent, backdated so it renders stalled immediately --
   const stallBase = Date.now();
@@ -244,12 +282,29 @@ async function main() {
   emit("plan.step", { stepId: "plan-2", status: "active" });
   await sleep(700);
 
+  // usage beat 4 — final tally just before agent.end; in+out must clear 96k
+  emit("agent.usage", {
+    agentId: "demo-b1",
+    tokens: { in: 4000, out: 93000, cacheRead: 600000, cacheWrite: 20000 },
+    costUsd: 1.662,
+  });
+  await sleep(400);
+
   emit("agent.end", {
     agentId: "demo-b1",
     agentType: "builder",
     finalMessage: "Server boots clean; SSE snapshot and fleet events verified against spec.",
   });
   await sleep(1500);
+
+  // session-level usage beat (agentId: null) — main-loop transcript totals,
+  // distinct from any single subagent's tally
+  emit("agent.usage", {
+    agentId: null,
+    tokens: { in: 8000, out: 45000, cacheRead: 900000, cacheWrite: 30000 },
+    costUsd: 1.0815,
+  });
+  await sleep(500);
 
   // ---- 6. null-id codex-direct pair ---------------------------------------
   emit("agent.start", {
