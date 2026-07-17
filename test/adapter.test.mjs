@@ -393,3 +393,89 @@ describe("adapters/claude-code.mjs — never-throws / whitelist guarantees", () 
     assert.equal(event.agentId, "toolu_codex1");
   });
 });
+
+describe("v3 subject backfill — subagent task tools also emit plan.step (§20)", () => {
+  test("subagent TaskCreate Post -> [activity end, plan.step with subject]", () => {
+    const payload = {
+      session_id: "s1",
+      hook_event_name: "PostToolUse",
+      agent_id: "a1",
+      tool_name: "TaskCreate",
+      tool_input: { subject: "Wire the SSE endpoint" },
+      tool_response: { task: { id: "9" } },
+      tool_use_id: "toolu_tc1",
+      duration_ms: 12,
+    };
+    const events = translate(payload);
+    assert.equal(events.length, 2);
+    assert.equal(events[0].kind, "agent.activity");
+    assert.equal(events[0].phase, "end");
+    assert.equal(events[0].agentId, "a1");
+    assert.equal(events[1].kind, "plan.step");
+    assert.equal(events[1].stepId, "9");
+    assert.equal(events[1].subject, "Wire the SSE endpoint");
+    assert.equal(events[1].status, "pending");
+  });
+
+  test("subagent TaskCreate Post without tool_response.task.id -> activity only", () => {
+    const payload = {
+      session_id: "s1",
+      hook_event_name: "PostToolUse",
+      agent_id: "a1",
+      tool_name: "TaskCreate",
+      tool_input: { subject: "Orphan" },
+      tool_response: {},
+      tool_use_id: "toolu_tc2",
+    };
+    const events = translate(payload);
+    assert.equal(events.length, 1);
+    assert.equal(events[0].kind, "agent.activity");
+  });
+
+  test("subagent TaskUpdate Pre -> [activity start, plan.step with mapped status]", () => {
+    const payload = {
+      session_id: "s1",
+      hook_event_name: "PreToolUse",
+      agent_id: "a1",
+      tool_name: "TaskUpdate",
+      tool_input: { taskId: "9", status: "in_progress" },
+      tool_use_id: "toolu_tu1",
+    };
+    const events = translate(payload);
+    assert.equal(events.length, 2);
+    assert.equal(events[0].kind, "agent.activity");
+    assert.equal(events[0].phase, "start");
+    assert.equal(events[1].kind, "plan.step");
+    assert.equal(events[1].stepId, "9");
+    assert.equal(events[1].status, "active");
+  });
+
+  test("subagent TaskUpdate Pre with subject carries it (untitled-step backfill)", () => {
+    const payload = {
+      session_id: "s1",
+      hook_event_name: "PreToolUse",
+      agent_id: "a1",
+      tool_name: "TaskUpdate",
+      tool_input: { taskId: "9", subject: "Now titled" },
+      tool_use_id: "toolu_tu2",
+    };
+    const events = translate(payload);
+    assert.equal(events.length, 2);
+    assert.equal(events[1].kind, "plan.step");
+    assert.equal(events[1].subject, "Now titled");
+  });
+
+  test("subagent TaskUpdate Pre with nothing mappable -> activity only", () => {
+    const payload = {
+      session_id: "s1",
+      hook_event_name: "PreToolUse",
+      agent_id: "a1",
+      tool_name: "TaskUpdate",
+      tool_input: { taskId: "9" },
+      tool_use_id: "toolu_tu3",
+    };
+    const events = translate(payload);
+    assert.equal(events.length, 1);
+    assert.equal(events[0].kind, "agent.activity");
+  });
+});

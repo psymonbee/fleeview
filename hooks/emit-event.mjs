@@ -1,10 +1,20 @@
 #!/usr/bin/env node
-// FleetView capture hook: stdin JSON -> adapters/claude-code.mjs -> appended
-// neutral event lines. Pure observer: never throws/prints, always exit 0.
-// All filtering/truncation policy lives in the adapter.
+// FleetView capture hook: raw harness payload -> adapter -> appended neutral
+// event lines. Pure observer: never throws/prints, always exit 0. The adapter
+// is selected by argv[2] (docs/FLEETVIEW-SPEC.md §18.4): missing -> claude-code
+// (so the live wiring predating v3 keeps working unchanged), "codex" -> stdin
+// payload, "codex-notify" -> payload in the last argv argument (Codex notify
+// delivers JSON via argv and provides no stdin — reading stdin there could
+// hang the hook into its timeout).
 
 import { mkdirSync, appendFileSync } from "node:fs";
 import { dirname } from "node:path";
+
+const ADAPTERS = {
+  "claude-code": { module: "../adapters/claude-code.mjs", fn: "translate", stdin: true },
+  "codex": { module: "../adapters/codex.mjs", fn: "translate", stdin: true },
+  "codex-notify": { module: "../adapters/codex.mjs", fn: "translateNotify", stdin: false },
+};
 
 async function readStdin() {
   return new Promise((resolve) => {
@@ -23,7 +33,17 @@ async function readStdin() {
 async function main() {
   if (process.env.FLEET_IGNORE === "1") process.exit(0);
 
-  const raw = await readStdin();
+  const mode = process.argv[2] ?? "claude-code";
+  const spec = ADAPTERS[mode];
+  if (!spec) return;
+
+  let raw;
+  if (spec.stdin) {
+    raw = await readStdin();
+  } else {
+    raw = process.argv[process.argv.length - 1];
+    if (raw === mode) return; // no payload argument was appended
+  }
 
   let payload;
   try {
@@ -34,8 +54,8 @@ async function main() {
 
   let events = [];
   try {
-    const { translate } = await import(new URL("../adapters/claude-code.mjs", import.meta.url));
-    events = translate(payload);
+    const mod = await import(new URL(spec.module, import.meta.url));
+    events = mod[spec.fn](payload);
   } catch {
     return;
   }

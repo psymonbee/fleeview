@@ -24,6 +24,51 @@ function hasAgentId(payload) {
   return payload.agent_id !== undefined && payload.agent_id !== null;
 }
 
+// Task lists are session-shared, so plan.step events are emitted for
+// TaskUpdate/TaskCreate wherever they happen — main loop or inside a
+// subagent (§20: the agent_id branch previously swallowed the subject).
+function taskUpdateStep(input, base) {
+  const stepId = input.taskId;
+  if (stepId === undefined || stepId === null) return [];
+
+  const event = { ...base, kind: "plan.step", stepId };
+  let mappable = false;
+
+  if (input.subject !== undefined) {
+    event.subject = truncate(input.subject, 200);
+    mappable = true;
+  }
+
+  if (input.status === "deleted") {
+    event.deleted = true;
+    mappable = true;
+  } else if (Object.prototype.hasOwnProperty.call(STATUS_MAP, input.status)) {
+    event.status = STATUS_MAP[input.status];
+    mappable = true;
+  }
+
+  if (!mappable) return [];
+  return [event];
+}
+
+function taskCreateStep(input, response, base) {
+  const taskId =
+    response && typeof response === "object" && response.task
+      ? response.task.id
+      : undefined;
+  if (taskId === undefined || taskId === null) return [];
+
+  return [
+    {
+      ...base,
+      kind: "plan.step",
+      stepId: taskId,
+      subject: truncate(input.subject, 200),
+      status: "pending",
+    },
+  ];
+}
+
 function translatePreToolUse(payload, base) {
   const toolName = payload.tool_name;
   const input = payload.tool_input && typeof payload.tool_input === "object" ? payload.tool_input : {};
@@ -55,6 +100,7 @@ function translatePreToolUse(payload, base) {
       hint,
     };
     if (file !== undefined && file !== null) event.file = file;
+    if (toolName === "TaskUpdate") return [event, ...taskUpdateStep(input, base)];
     return [event];
   }
 
@@ -71,27 +117,7 @@ function translatePreToolUse(payload, base) {
   }
 
   if (toolName === "TaskUpdate") {
-    const stepId = input.taskId;
-    if (stepId === undefined || stepId === null) return [];
-
-    const event = { ...base, kind: "plan.step", stepId };
-    let mappable = false;
-
-    if (input.subject !== undefined) {
-      event.subject = truncate(input.subject, 200);
-      mappable = true;
-    }
-
-    if (input.status === "deleted") {
-      event.deleted = true;
-      mappable = true;
-    } else if (Object.prototype.hasOwnProperty.call(STATUS_MAP, input.status)) {
-      event.status = STATUS_MAP[input.status];
-      mappable = true;
-    }
-
-    if (!mappable) return [];
-    return [event];
+    return taskUpdateStep(input, base);
   }
 
   if (toolName === "ExitPlanMode") {
@@ -125,17 +151,17 @@ function translatePostToolUse(payload, base) {
   }
 
   if (hasAgentId(payload)) {
-    return [
-      {
-        ...base,
-        kind: "agent.activity",
-        agentId: payload.agent_id,
-        phase: "end",
-        callId: payload.tool_use_id,
-        tool: toolName,
-        ms: payload.duration_ms,
-      },
-    ];
+    const event = {
+      ...base,
+      kind: "agent.activity",
+      agentId: payload.agent_id,
+      phase: "end",
+      callId: payload.tool_use_id,
+      tool: toolName,
+      ms: payload.duration_ms,
+    };
+    if (toolName === "TaskCreate") return [event, ...taskCreateStep(input, response, base)];
+    return [event];
   }
 
   if (typeof toolName === "string" && toolName.startsWith("mcp__codex__")) {
@@ -150,21 +176,7 @@ function translatePostToolUse(payload, base) {
   }
 
   if (toolName === "TaskCreate") {
-    const taskId =
-      response && typeof response === "object" && response.task
-        ? response.task.id
-        : undefined;
-    if (taskId === undefined || taskId === null) return [];
-
-    return [
-      {
-        ...base,
-        kind: "plan.step",
-        stepId: taskId,
-        subject: truncate(input.subject, 200),
-        status: "pending",
-      },
-    ];
+    return taskCreateStep(input, response, base);
   }
 
   return [];
