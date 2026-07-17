@@ -1,0 +1,26 @@
+{
+  "session_id": "9d4c8bcd-616a-4a61-a54f-dce98d158d04",
+  "transcript_path": "/Users/simon/.claude/projects/-Users-simon-lumenADE/9d4c8bcd-616a-4a61-a54f-dce98d158d04.jsonl",
+  "cwd": "/Users/simon/lumenADE",
+  "prompt_id": "ee644713-0257-4e4a-bce7-85841d62bb74",
+  "permission_mode": "auto",
+  "agent_id": "a3912fb66b59d81d4",
+  "agent_type": "claude",
+  "effort": {
+    "level": "xhigh"
+  },
+  "hook_event_name": "SubagentStop",
+  "stop_hook_active": false,
+  "agent_transcript_path": "/Users/simon/.claude/projects/-Users-simon-lumenADE/9d4c8bcd-616a-4a61-a54f-dce98d158d04/subagents/agent-a3912fb66b59d81d4.jsonl",
+  "last_assistant_message": "All three probe steps executed: the cat failed as expected, echo passed, and package.json was read.\n\nresult: Probe complete: one failing bash, one passing bash, one read.",
+  "background_tasks": [
+    {
+      "id": "a3912fb66b59d81d4",
+      "type": "subagent",
+      "status": "running",
+      "description": "Probe: failing bash in subagent",
+      "agent_type": "claude"
+    }
+  ],
+  "session_crons": []
+}

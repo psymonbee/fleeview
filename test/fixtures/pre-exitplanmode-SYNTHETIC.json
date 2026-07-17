@@ -1,0 +1,14 @@
+{
+  "_synthetic": "Not hook-captured: headless claude never dispatches ExitPlanMode to hooks. Envelope copied from captured PreToolUse fixtures; tool_input keys confirmed against a real interactive ExitPlanMode tool_use (transcript 595b1335, 2026-07-17): input has exactly one key, 'plan' (markdown string). Re-verify against a live interactive session in S8.",
+  "session_id": "9d4c8bcd-616a-4a61-a54f-dce98d158d04",
+  "transcript_path": "/Users/simon/.claude/projects/-Users-simon-lumenADE/9d4c8bcd-616a-4a61-a54f-dce98d158d04.jsonl",
+  "cwd": "/Users/simon/lumenADE",
+  "prompt_id": "ee644713-0257-4e4a-bce7-85841d62bb74",
+  "permission_mode": "plan",
+  "hook_event_name": "PreToolUse",
+  "tool_name": "ExitPlanMode",
+  "tool_input": {
+    "plan": "## Add `/version` endpoint\n\n- Add `\"version\": \"0.1.0\"` to `package.json` and read it at startup into a `PKG_VERSION` constant.\n- In the `http.createServer` handler, add a `urlPath === \"/version\"` branch returning `{\"version\": PKG_VERSION}` as JSON.\n- Verify with `curl http://localhost:4747/version`."
+  },
+  "tool_use_id": "toolu_01SyntheticExitPlanFixture"
+}

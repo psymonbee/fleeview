@@ -1,0 +1,29 @@
+{
+  "session_id": "9d4c8bcd-616a-4a61-a54f-dce98d158d04",
+  "transcript_path": "/Users/simon/.claude/projects/-Users-simon-lumenADE/9d4c8bcd-616a-4a61-a54f-dce98d158d04.jsonl",
+  "cwd": "/Users/simon/lumenADE",
+  "prompt_id": "ee644713-0257-4e4a-bce7-85841d62bb74",
+  "permission_mode": "auto",
+  "effort": {
+    "level": "xhigh"
+  },
+  "hook_event_name": "PostToolUse",
+  "tool_name": "Agent",
+  "tool_input": {
+    "description": "Probe: failing bash in subagent",
+    "prompt": "This is a hook-payload probe run. Do exactly the following, in order:\n1. Run the Bash command: cat /nonexistent-fleetview-probe-file-12345\n   It WILL fail with \"No such file or directory\" — that failure is expected and is the entire point. Do not retry it, do not investigate, do not try an alternative.\n2. Run the Bash command: echo probe-ok\n3. Read the file /Users/simon/lumenADE/package.json\nThen finish, returning exactly this final message: \"Probe complete: one failing bash, one passing bash, one read.\"",
+    "subagent_type": "claude"
+  },
+  "tool_response": {
+    "isAsync": true,
+    "status": "async_launched",
+    "agentId": "a3912fb66b59d81d4",
+    "description": "Probe: failing bash in subagent",
+    "resolvedModel": "claude-fable-5",
+    "prompt": "This is a hook-payload probe run. Do exactly the following, in order:\n1. Run the Bash command: cat /nonexistent-fleetview-probe-file-12345\n   It WILL fail with \"No such file or directory\" — that failure is expected and is the entire point. Do not retry it, do not investigate, do not try an alternative.\n2. Run the Bash command: echo probe-ok\n3. Read the file /Users/simon/lumenADE/package.json\nThen finish, returning exactly this final message: \"Probe complete: one failing bash, one passing bash, one read.\"",
+    "outputFile": "/private/tmp/claude-501/-Users-simon-lumenADE/9d4c8bcd-616a-4a61-a54f-dce98d158d04/tasks/a3912fb66b59d81d4.output",
+    "canReadOutputFile": true
+  },
+  "tool_use_id": "toolu_013P9B6fqK1G1ieJg1vbi2gL",
+  "duration_ms": 11
+}

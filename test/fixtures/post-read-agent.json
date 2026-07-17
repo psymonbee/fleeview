@@ -1,0 +1,29 @@
+{
+  "session_id": "9d4c8bcd-616a-4a61-a54f-dce98d158d04",
+  "transcript_path": "/Users/simon/.claude/projects/-Users-simon-lumenADE/9d4c8bcd-616a-4a61-a54f-dce98d158d04.jsonl",
+  "cwd": "/Users/simon/lumenADE",
+  "prompt_id": "ee644713-0257-4e4a-bce7-85841d62bb74",
+  "permission_mode": "auto",
+  "agent_id": "a3912fb66b59d81d4",
+  "agent_type": "claude",
+  "effort": {
+    "level": "xhigh"
+  },
+  "hook_event_name": "PostToolUse",
+  "tool_name": "Read",
+  "tool_input": {
+    "file_path": "/Users/simon/lumenADE/package.json"
+  },
+  "tool_response": {
+    "type": "text",
+    "file": {
+      "filePath": "/Users/simon/lumenADE/package.json",
+      "content": "{\n  \"name\": \"lumenade\",\n  \"private\": true,\n  \"type\": \"module\",\n  \"scripts\": {\n    \"start\": \"node server/server.mjs\",\n    \"demo\": \"node scripts/demo.mjs\"\n  },\n  \"engines\": {\n    \"node\": \">=20\"\n  }\n}\n",
+      "numLines": 13,
+      "startLine": 1,
+      "totalLines": 13
+    }
+  },
+  "tool_use_id": "toolu_01GxvaBwu3BBPZS5fztiT5Av",
+  "duration_ms": 1
+}
