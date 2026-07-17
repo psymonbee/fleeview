@@ -209,6 +209,7 @@
       display: flex;
       min-height: 0;
       height: 100%;
+      overflow-x: clip;
     }
 
     .rail {
@@ -479,13 +480,30 @@
     }
 
     .hub-subtitle {
+      display: flex;
+      align-items: baseline;
+      gap: 6px;
       margin-top: 5px;
       overflow: hidden;
       color: var(--muted);
       font-size: 11px;
       line-height: 1.2;
+      white-space: nowrap;
+    }
+
+    .hub-subtitle-text {
+      min-width: 0;
+      overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
+    }
+
+    .hub-tokens {
+      flex: 0 0 auto;
+      color: rgba(139,148,167,.7);
+      font-family: var(--mono);
+      font-size: 10px;
+      font-variant-numeric: tabular-nums;
     }
 
     .empty {
@@ -604,6 +622,21 @@
       line-height: 1;
       text-overflow: ellipsis;
       text-transform: uppercase;
+      white-space: nowrap;
+    }
+
+    .tokens-badge {
+      flex: 0 0 auto;
+      padding: 3px 7px;
+      border: 1px solid rgba(230,234,242,.09);
+      border-radius: 999px;
+      background: rgba(255,255,255,.045);
+      color: rgba(230,234,242,.6);
+      font-family: var(--mono);
+      font-size: 10px;
+      font-weight: 700;
+      line-height: 1;
+      font-variant-numeric: tabular-nums;
       white-space: nowrap;
     }
 
@@ -834,6 +867,41 @@
       font-size: 12px;
       font-style: italic;
       line-height: 1.4;
+    }
+
+    .drawer-tokens {
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+      padding: 10px 12px;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      background: rgba(255,255,255,.02);
+    }
+
+    .drawer-tokens-row {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 8px;
+      color: var(--muted);
+      font-size: 11px;
+    }
+
+    .drawer-tokens-value {
+      color: rgba(230,234,242,.85);
+      font-family: var(--mono);
+      font-variant-numeric: tabular-nums;
+    }
+
+    .drawer-tokens-cost {
+      margin-top: 3px;
+      padding-top: 8px;
+      border-top: 1px solid rgba(35,43,56,.6);
+      color: rgba(230,234,242,.85);
+      font-family: var(--mono);
+      font-size: 11px;
+      text-align: right;
     }
 
     .drawer-log-head {
@@ -1077,7 +1145,10 @@
               </div>
               <div class="hub-text">
                 <div class="hub-title" id="hubTitle">Fable 5</div>
-                <div class="hub-subtitle" id="hubSubtitle">Orchestrator · No session</div>
+                <div class="hub-subtitle" id="hubSubtitle">
+                  <span class="hub-subtitle-text" id="hubSubtitleText">Orchestrator · No session</span>
+                  <span class="hub-tokens" id="hubTokens" hidden></span>
+                </div>
               </div>
             </div>
           </section>
@@ -1101,6 +1172,13 @@
         <div class="drawer-body">
           <div class="drawer-desc" id="drawerDesc"></div>
           <div class="files-row" id="drawerFiles"></div>
+          <div class="drawer-tokens" id="drawerTokens" hidden>
+            <div class="drawer-tokens-row"><span>in</span><span class="drawer-tokens-value" id="drawerTokensIn"></span></div>
+            <div class="drawer-tokens-row"><span>out</span><span class="drawer-tokens-value" id="drawerTokensOut"></span></div>
+            <div class="drawer-tokens-row"><span>cache read</span><span class="drawer-tokens-value" id="drawerTokensCacheRead"></span></div>
+            <div class="drawer-tokens-row"><span>cache write</span><span class="drawer-tokens-value" id="drawerTokensCacheWrite"></span></div>
+            <div class="drawer-tokens-cost" id="drawerTokensCost" hidden></div>
+          </div>
           <div class="drawer-final" id="drawerFinal" hidden></div>
           <div class="drawer-log-head">Activity log</div>
           <div class="drawer-log" id="drawerLog"></div>
@@ -1143,6 +1221,8 @@
         hub: document.getElementById("hub"),
         hubTitle: document.getElementById("hubTitle"),
         hubSubtitle: document.getElementById("hubSubtitle"),
+        hubSubtitleText: document.getElementById("hubSubtitleText"),
+        hubTokens: document.getElementById("hubTokens"),
         empty: document.getElementById("empty"),
         agents: document.getElementById("agents"),
         picker: document.getElementById("sessionPicker"),
@@ -1161,6 +1241,12 @@
         drawerStatus: document.getElementById("drawerStatus"),
         drawerDesc: document.getElementById("drawerDesc"),
         drawerFiles: document.getElementById("drawerFiles"),
+        drawerTokens: document.getElementById("drawerTokens"),
+        drawerTokensIn: document.getElementById("drawerTokensIn"),
+        drawerTokensOut: document.getElementById("drawerTokensOut"),
+        drawerTokensCacheRead: document.getElementById("drawerTokensCacheRead"),
+        drawerTokensCacheWrite: document.getElementById("drawerTokensCacheWrite"),
+        drawerTokensCost: document.getElementById("drawerTokensCost"),
         drawerFinal: document.getElementById("drawerFinal"),
         drawerLog: document.getElementById("drawerLog"),
         drawerClose: document.getElementById("drawerClose")
@@ -1188,6 +1274,35 @@
 
       function accent(agent) {
         return agent.provider === "openai" ? "var(--openai)" : "var(--anthropic)";
+      }
+
+      // --- token / cost formatting -----------------------------------------
+
+      function fmtTokens(n) {
+        if (n == null) return "";
+        const value = Number(n) || 0;
+        if (value < 1000) return String(Math.round(value));
+        const useM = value >= 1e6;
+        const scaled = value / (useM ? 1e6 : 1000);
+        const rounded = Math.round(scaled * 10) / 10;
+        const text = Number.isInteger(rounded) ? String(rounded) : rounded.toFixed(1);
+        return `${text}${useM ? "M" : "k"}`;
+      }
+
+      function fmtInt(n) {
+        return (Number(n) || 0).toLocaleString("en-US");
+      }
+
+      function tokensTitle(tokens) {
+        return `in ${fmtInt(tokens.in)} · out ${fmtInt(tokens.out)} · cache read ${fmtInt(tokens.cacheRead)} · cache write ${fmtInt(tokens.cacheWrite)}`;
+      }
+
+      function fmtUsd(v) {
+        if (v == null) return "";
+        const n = Number(v);
+        if (!Number.isFinite(n)) return "";
+        const dp = Math.abs(n) < 1 ? 4 : 2;
+        return `$${n.toFixed(dp)}`;
       }
 
       function latestSessionId() {
@@ -1325,6 +1440,19 @@
         }
       }
 
+      function renderTokensBadge(node, agent) {
+        const badge = node.querySelector(".tokens-badge");
+        if (!badge) return;
+        if (agent.tokens == null) {
+          badge.hidden = true;
+          return;
+        }
+        badge.hidden = false;
+        const total = (agent.tokens.in || 0) + (agent.tokens.out || 0);
+        badge.textContent = fmtTokens(total);
+        badge.title = tokensTitle(agent.tokens);
+      }
+
       // --- plan rail --------------------------------------------------------
 
       function renderRail(session) {
@@ -1453,6 +1581,21 @@
           els.drawerFinal.textContent = agent.finalMessage;
         } else {
           els.drawerFinal.hidden = true;
+        }
+        if (agent.tokens == null) {
+          els.drawerTokens.hidden = true;
+        } else {
+          els.drawerTokens.hidden = false;
+          els.drawerTokensIn.textContent = fmtInt(agent.tokens.in);
+          els.drawerTokensOut.textContent = fmtInt(agent.tokens.out);
+          els.drawerTokensCacheRead.textContent = fmtInt(agent.tokens.cacheRead);
+          els.drawerTokensCacheWrite.textContent = fmtInt(agent.tokens.cacheWrite);
+          if (agent.costUsd != null) {
+            els.drawerTokensCost.hidden = false;
+            els.drawerTokensCost.textContent = `est. ${fmtUsd(agent.costUsd)}`;
+          } else {
+            els.drawerTokensCost.hidden = true;
+          }
         }
       }
 
@@ -1619,7 +1762,18 @@
         els.hubTitle.textContent = hubTitle;
         els.hub.setAttribute("aria-label", `${hubTitle} orchestrator`);
         const cwdBase = session ? basename(session.cwd) : "No session";
-        els.hubSubtitle.textContent = hubTitle === "Orchestrator" ? cwdBase : `Orchestrator · ${cwdBase}`;
+        els.hubSubtitleText.textContent = hubTitle === "Orchestrator" ? cwdBase : `Orchestrator · ${cwdBase}`;
+        const sessionTokens = session?.tokens;
+        if (sessionTokens == null) {
+          els.hubTokens.hidden = true;
+        } else {
+          els.hubTokens.hidden = false;
+          const total = (sessionTokens.in || 0) + (sessionTokens.out || 0);
+          els.hubTokens.textContent = fmtTokens(total);
+          let title = tokensTitle(sessionTokens);
+          if (session.costUsd != null) title += ` · est. ${fmtUsd(session.costUsd)}`;
+          els.hubTokens.title = title;
+        }
         els.empty.hidden = agents.length > 0;
       }
 
@@ -1641,6 +1795,7 @@
               <span class="brand-chip"><img alt=""><\/span>
               <div class="agent-label"><\/div>
               <span class="step-tag" hidden><\/span>
+              <span class="tokens-badge" hidden><\/span>
               <div class="model"><\/div>
             <\/div>
             <div class="description"><\/div>
@@ -1680,6 +1835,7 @@
         node.querySelector(".model").textContent = agent.model || "Claude";
         node.querySelector(".description").textContent = agent.description || "Working in the session";
         renderStepTag(node, agent, plan);
+        renderTokensBadge(node, agent);
 
         const status = node.querySelector(".status-line");
         const finalElapsed = elapsed(agent.startedAt, agent.endedAt);
