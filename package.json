@@ -1,6 +1,7 @@
 {
   "name": "fleetview",
   "private": true,
+  "license": "MIT",
   "type": "module",
   "bin": {
     "fleetview": "bin/install.mjs"

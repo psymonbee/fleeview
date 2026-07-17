@@ -34,6 +34,7 @@ const EIGHT_EVENTS = [
 ];
 const TOOL_EVENTS = new Set(["PreToolUse", "PostToolUse"]);
 const VENDOR_WHITELIST = [
+  "LICENSE",
   "hooks",
   "adapters",
   "server",

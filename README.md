@@ -187,3 +187,7 @@ the second deletes the vendored app and the events log. Settings backups
 from every install/uninstall are left under
 `~/.claude/settings.json.fleetview-backup-<timestamp>` for you to inspect or
 restore from. No other state is written anywhere on the machine.
+
+## License
+
+[MIT](LICENSE)
