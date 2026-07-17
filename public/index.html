@@ -394,7 +394,7 @@
       left: 8%;
       top: 50%;
       width: 224px;
-      height: 72px;
+      height: 88px;
       transform: translateY(-50%);
       border: 1px solid var(--border);
       border-radius: var(--radius);
@@ -506,6 +506,24 @@
       font-variant-numeric: tabular-nums;
     }
 
+    .hub-activity {
+      overflow: hidden;
+      max-height: 14px;
+      margin-top: 4px;
+      color: rgba(139,148,167,.78);
+      font-family: var(--mono);
+      font-size: 10px;
+      line-height: 1.3;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      opacity: 0;
+      transition: opacity .2s ease;
+    }
+
+    .hub-activity.show {
+      opacity: 1;
+    }
+
     .empty {
       position: absolute;
       z-index: 2;
@@ -529,7 +547,7 @@
 
     .agent {
       position: absolute;
-      left: 52%;
+      left: calc(52% + var(--indent, 0px));
       width: 280px;
       min-height: 108px;
       border: 1px solid var(--border);
@@ -762,10 +780,35 @@
       animation: chipPulse 1.4s ease-in-out infinite;
     }
 
+    .file-chip.cap-chip {
+      max-width: 108px;
+      font-family: var(--font);
+      font-weight: 650;
+    }
+
+    .file-chip.cap-skill {
+      border-color: rgba(232,162,61,.4);
+      background: rgba(232,162,61,.1);
+      color: var(--amber);
+    }
+
+    .file-chip.cap-mcp {
+      border-color: color-mix(in srgb, var(--accent, var(--openai)) 45%, transparent);
+      background: color-mix(in srgb, var(--accent, var(--openai)) 14%, transparent);
+      color: var(--accent, var(--openai));
+    }
+
     .file-empty {
       color: rgba(139,148,167,.5);
       font-size: 10px;
       font-style: italic;
+    }
+
+    /* Elements reusing .files-row (e.g. drawer capabilities) rely on the
+       `hidden` attribute to fully collapse; without this, the class's own
+       `display: flex` would out-rank the UA `[hidden]` rule. */
+    .files-row[hidden] {
+      display: none;
     }
 
     .drawer {
@@ -830,6 +873,15 @@
       color: var(--done);
     }
 
+    .drawer-spawned {
+      overflow: hidden;
+      margin-top: 6px;
+      color: var(--muted);
+      font-size: 10.5px;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
     .drawer-close {
       flex: 0 0 auto;
       width: 26px;
@@ -877,6 +929,11 @@
       border: 1px solid var(--border);
       border-radius: 10px;
       background: rgba(255,255,255,.02);
+    }
+
+    /* Same hidden-vs-display:flex precedence trap as .files-row above. */
+    .drawer-tokens[hidden] {
+      display: none;
     }
 
     .drawer-tokens-row {
@@ -1043,6 +1100,29 @@
       }
     }
 
+    /* §28a: 248px rail + 820px stage min-width forces a horizontal
+       scrollbar between 900-1068px. Auto-collapse the rail to the same
+       34px width/visual the user's manual toggle produces (see
+       `.rail.collapsed` above) so the canvas fits without scrolling. */
+    @media (max-width: 1068px) {
+      .rail {
+        width: 34px;
+      }
+
+      .rail .rail-head {
+        padding: 0 6px;
+        justify-content: center;
+      }
+
+      .rail .rail-title {
+        display: none;
+      }
+
+      .rail .rail-body {
+        display: none;
+      }
+    }
+
     @media (max-width: 899px) {
       .rail {
         display: none !important;
@@ -1078,7 +1158,7 @@
       }
 
       .agent {
-        left: 370px;
+        left: calc(370px + var(--indent, 0px));
       }
 
       .empty {
@@ -1149,6 +1229,7 @@
                   <span class="hub-subtitle-text" id="hubSubtitleText">Orchestrator · No session</span>
                   <span class="hub-tokens" id="hubTokens" hidden></span>
                 </div>
+                <div class="hub-activity" id="hubActivity"></div>
               </div>
             </div>
           </section>
@@ -1166,11 +1247,13 @@
               <span class="model" id="drawerModel"></span>
               <span class="drawer-status" id="drawerStatus"></span>
             </div>
+            <div class="drawer-spawned" id="drawerSpawned" hidden></div>
           </div>
           <button class="drawer-close" id="drawerClose" type="button" aria-label="Close">✕</button>
         </div>
         <div class="drawer-body">
           <div class="drawer-desc" id="drawerDesc"></div>
+          <div class="files-row" id="drawerCaps" hidden></div>
           <div class="files-row" id="drawerFiles"></div>
           <div class="drawer-tokens" id="drawerTokens" hidden>
             <div class="drawer-tokens-row"><span>in</span><span class="drawer-tokens-value" id="drawerTokensIn"></span></div>
@@ -1194,6 +1277,11 @@
       const CARD_H = 108;
       const HUB_W = 224;
       const NARRATIVE_FRESH_MS = 90000;
+      const LINEAGE_INDENT = 24;
+      const LINEAGE_DEPTH_CAP = 2;
+      const CAP_GLYPH = { skill: "✦", mcp: "⌁" };
+      const EMPTY_IDLE_TEXT = "Fleet idle — run  npm run demo  to see it move.";
+      const EMPTY_WORKING_TEXT = "Fleet idle — the orchestrator is working, no agents spawned yet.";
       // Brand marks (white variants, via Brandfetch) inlined as data URIs so the
       // page keeps its no-external-requests guarantee.
       const LOGOS = {
@@ -1223,6 +1311,7 @@
         hubSubtitle: document.getElementById("hubSubtitle"),
         hubSubtitleText: document.getElementById("hubSubtitleText"),
         hubTokens: document.getElementById("hubTokens"),
+        hubActivity: document.getElementById("hubActivity"),
         empty: document.getElementById("empty"),
         agents: document.getElementById("agents"),
         picker: document.getElementById("sessionPicker"),
@@ -1239,7 +1328,9 @@
         drawerLabel: document.getElementById("drawerLabel"),
         drawerModel: document.getElementById("drawerModel"),
         drawerStatus: document.getElementById("drawerStatus"),
+        drawerSpawned: document.getElementById("drawerSpawned"),
         drawerDesc: document.getElementById("drawerDesc"),
+        drawerCaps: document.getElementById("drawerCaps"),
         drawerFiles: document.getElementById("drawerFiles"),
         drawerTokens: document.getElementById("drawerTokens"),
         drawerTokensIn: document.getElementById("drawerTokensIn"),
@@ -1328,6 +1419,54 @@
           .sort((a, b) => parseTime(a.startedAt) - parseTime(b.startedAt));
       }
 
+      // --- lineage (§24) -----------------------------------------------------
+      // Reorders a startedAt-sorted list depth-first: each agent's children
+      // (in startedAt order) render immediately after it. An agent whose
+      // parentId doesn't resolve to another agent in the same list renders as
+      // a root — this is exactly v3 flat behavior when parentId is absent.
+
+      function resolveParentAgent(agent, byId) {
+        const parentId = agent.parentId;
+        if (!parentId || parentId === agent.id) return null;
+        return byId.get(parentId) || null;
+      }
+
+      function lineageOrder(list) {
+        const byId = new Map(list.map(agent => [agent.id, agent]));
+        const childrenOf = new Map();
+        const roots = [];
+        for (const agent of list) {
+          const parent = resolveParentAgent(agent, byId);
+          if (parent) {
+            if (!childrenOf.has(parent.id)) childrenOf.set(parent.id, []);
+            childrenOf.get(parent.id).push(agent);
+          } else {
+            roots.push(agent);
+          }
+        }
+        const agents = [];
+        const depthOf = new Map();
+        const parentOf = new Map();
+        const visit = (agent, depth, parent) => {
+          if (depthOf.has(agent.id)) return;
+          agents.push(agent);
+          depthOf.set(agent.id, depth);
+          parentOf.set(agent.id, parent);
+          for (const child of childrenOf.get(agent.id) || []) visit(child, depth + 1, agent);
+        };
+        roots.forEach(root => visit(root, 0, null));
+        // Defensive: a parent cycle (shouldn't happen — reducer guards
+        // self-reference) must never drop an agent from render.
+        for (const agent of list) {
+          if (!depthOf.has(agent.id)) visit(agent, 0, null);
+        }
+        return { agents, depthOf, parentOf };
+      }
+
+      function indentPx(depth) {
+        return Math.min(depth, LINEAGE_DEPTH_CAP) * LINEAGE_INDENT;
+      }
+
       function upsertSession(session) {
         if (session?.id) state.sessions.set(session.id, session);
       }
@@ -1401,18 +1540,36 @@
         return collisions;
       }
 
+      // --- capability chips (§26) --------------------------------------------
+
+      function capChipNode(cap) {
+        const kind = cap.kind === "skill" ? "skill" : "mcp";
+        const chip = document.createElement("span");
+        chip.className = `file-chip cap-chip cap-${kind}`;
+        const glyph = CAP_GLYPH[kind] || "";
+        chip.textContent = `${glyph} ${cap.name}`.trim();
+        chip.title = `${kind}: ${cap.name}`;
+        return chip;
+      }
+
       function renderFiles(container, agent, collisions) {
+        const caps = agent.capabilities || [];
         const files = agent.files || [];
         container.innerHTML = "";
-        if (!files.length) {
+        if (!caps.length && !files.length) {
           const span = document.createElement("span");
           span.className = "file-empty";
           span.textContent = "no files touched";
           container.append(span);
           return;
         }
-        const shown = files.slice(0, 3);
-        for (const file of shown) {
+        // Capability chips render first, sharing the row's ≤3-visible + +N
+        // overflow budget with file chips (total across both kinds).
+        const budget = 3;
+        const shownCaps = caps.slice(0, budget);
+        const shownFiles = files.slice(0, Math.max(0, budget - shownCaps.length));
+        for (const cap of shownCaps) container.append(capChipNode(cap));
+        for (const file of shownFiles) {
           const chip = document.createElement("span");
           chip.className = "file-chip";
           chip.textContent = basename(file);
@@ -1420,7 +1577,7 @@
           if (agent.status === "running" && collisions.has(file)) chip.classList.add("collision");
           container.append(chip);
         }
-        const overflow = files.length - shown.length;
+        const overflow = (caps.length + files.length) - (shownCaps.length + shownFiles.length);
         if (overflow > 0) {
           const chip = document.createElement("span");
           chip.className = "file-chip file-more";
@@ -1464,7 +1621,12 @@
         els.rail.setAttribute("aria-hidden", visible ? "false" : "true");
         if (!visible) return;
 
-        const collapsed = localStorage.getItem("fleet.railCollapsed") === "1";
+        // §28a: below 1069px the rail auto-collapses (same visual/state the
+        // user toggle produces) so the 820px-min-width stage never forces a
+        // horizontal scrollbar. The stored preference is left untouched, so
+        // widening back past 1069px restores whatever the user last chose.
+        const forceCollapsed = window.innerWidth < 1069;
+        const collapsed = forceCollapsed || localStorage.getItem("fleet.railCollapsed") === "1";
         els.rail.classList.toggle("collapsed", collapsed);
         els.railToggle.textContent = collapsed ? "›" : "‹";
         els.railToggle.setAttribute("aria-expanded", String(!collapsed));
@@ -1559,7 +1721,26 @@
         const isDone = agent.status === "done";
         els.drawerStatus.textContent = isDone ? "done" : "running";
         els.drawerStatus.classList.toggle("done", isDone);
+        // §24: same custom accent this agent's card uses, so drawer mcp chips
+        // (see .cap-mcp) pick up the matching provider tint.
+        els.drawer.style.setProperty("--accent", accent(agent));
+        const parentId = agent.parentId;
+        const parent = parentId && parentId !== agent.id ? state.agents.get(parentId) : null;
+        if (parent) {
+          els.drawerSpawned.hidden = false;
+          els.drawerSpawned.textContent = `spawned by ${parent.label || parent.agentType || "agent"}`;
+        } else {
+          els.drawerSpawned.hidden = true;
+        }
         els.drawerDesc.textContent = agent.description || "Working in the session";
+        const caps = agent.capabilities || [];
+        els.drawerCaps.innerHTML = "";
+        if (caps.length) {
+          caps.forEach(cap => els.drawerCaps.append(capChipNode(cap)));
+          els.drawerCaps.hidden = false;
+        } else {
+          els.drawerCaps.hidden = true;
+        }
         els.drawerFiles.innerHTML = "";
         const files = agent.files || [];
         if (!files.length) {
@@ -1774,7 +1955,23 @@
           if (session.costUsd != null) title += ` · est. ${fmtUsd(session.costUsd)}`;
           els.hubTokens.title = title;
         }
+        // §25: pre-plan orchestrator activity readout under the subtitle —
+        // shown only while the session is mid-turn and has a live activity.
+        const activity = session?.turnActive ? session.currentActivity : null;
+        if (activity && activity.tool) {
+          const text = activity.hint ? `${activity.tool}: ${activity.hint}` : activity.tool;
+          els.hubActivity.textContent = text;
+          els.hubActivity.title = text;
+          els.hubActivity.classList.add("show");
+        } else {
+          els.hubActivity.classList.remove("show");
+          els.hubActivity.textContent = "";
+          els.hubActivity.removeAttribute("title");
+        }
         els.empty.hidden = agents.length > 0;
+        if (!els.empty.hidden) {
+          els.empty.textContent = session?.currentActivity ? EMPTY_WORKING_TEXT : EMPTY_IDLE_TEXT;
+        }
       }
 
       function setConnection(open) {
@@ -1822,12 +2019,13 @@
         return path;
       }
 
-      function renderAgent(node, agent, index, total, startY, plan, collisions) {
+      function renderAgent(node, agent, index, total, startY, plan, collisions, depth) {
         const y = startY + index * RHYTHM;
         const isDone = agent.status === "done";
         const doneAge = agent.endedAt ? Date.now() - parseTime(agent.endedAt) : 0;
         node.style.setProperty("--y", `${y}px`);
         node.style.setProperty("--accent", accent(agent));
+        node.style.setProperty("--indent", `${indentPx(depth)}px`);
         node.classList.toggle("dim", isDone && doneAge > 20000);
         node.classList.toggle("fade", isDone && doneAge > 180000);
         node.querySelector(".agent-label").textContent = agent.label || agent.agentType || "Agent";
@@ -1874,15 +2072,30 @@
         }
       }
 
-      function renderPath(path, agent, index, startY) {
+      function cardX(compact, stageWidth, depth) {
+        const base = compact ? 370 : stageWidth * .52;
+        return base + indentPx(depth);
+      }
+
+      function renderPath(path, agent, index, startY, depth, parentInfo) {
         const stageBox = els.stage.getBoundingClientRect();
         const compact = window.matchMedia("(max-width: 760px)").matches;
-        const hubX = (compact ? 34 : stageBox.width * .08) + HUB_W;
-        const hubY = stageBox.height / 2;
-        const cardLeft = compact ? 370 : stageBox.width * .52;
+        const cardLeft = cardX(compact, stageBox.width, depth);
         const cardY = startY + index * RHYTHM + CARD_H / 2;
-        const mid = hubX + (cardLeft - hubX) * .5;
-        const d = `M ${hubX} ${hubY} C ${mid} ${hubY}, ${mid} ${cardY}, ${cardLeft} ${cardY}`;
+        let srcX, srcY, mid;
+        if (parentInfo) {
+          // §24: source at the parent card's left edge instead of the hub,
+          // bowing left so a parent→child link reads distinctly from the
+          // shallower hub→card sweep.
+          srcX = cardX(compact, stageBox.width, parentInfo.depth);
+          srcY = startY + parentInfo.index * RHYTHM + CARD_H / 2;
+          mid = Math.min(srcX, cardLeft) - 36;
+        } else {
+          srcX = (compact ? 34 : stageBox.width * .08) + HUB_W;
+          srcY = stageBox.height / 2;
+          mid = srcX + (cardLeft - srcX) * .5;
+        }
+        const d = `M ${srcX} ${srcY} C ${mid} ${srcY}, ${mid} ${cardY}, ${cardLeft} ${cardY}`;
         const isDone = agent.status === "done";
         const doneAge = agent.endedAt ? Date.now() - parseTime(agent.endedAt) : 0;
         path.setAttribute("d", d);
@@ -1913,7 +2126,8 @@
       function renderAll() {
         renderPicker();
         const session = activeSession();
-        const agents = selectedAgents(session);
+        const baseAgents = selectedAgents(session);
+        const { agents, depthOf, parentOf } = lineageOrder(baseAgents);
         const plan = currentPlan(session);
         const collisions = computeCollisions(agents);
         renderRail(session);
@@ -1921,13 +2135,19 @@
         els.stage.style.setProperty("--stage-h", `${minHeight}px`);
         renderChrome(session, agents, collisions);
         const startY = Math.max(110, (minHeight - ((agents.length - 1) * RHYTHM + CARD_H)) / 2);
+        const indexOf = new Map(agents.map((agent, i) => [agent.id, i]));
         const visibleIds = new Set();
         agents.forEach((agent, index) => {
           visibleIds.add(agent.id);
           const node = ensureNode(agent);
           const path = ensurePath(agent);
-          renderAgent(node, agent, index, agents.length, startY, plan, collisions);
-          renderPath(path, agent, index, startY);
+          const depth = depthOf.get(agent.id) || 0;
+          renderAgent(node, agent, index, agents.length, startY, plan, collisions, depth);
+          const parent = parentOf.get(agent.id);
+          const parentInfo = parent
+            ? { index: indexOf.get(parent.id), depth: depthOf.get(parent.id) || 0 }
+            : null;
+          renderPath(path, agent, index, startY, depth, parentInfo);
         });
         removeMissing(visibleIds);
         state.visible = visibleIds;
