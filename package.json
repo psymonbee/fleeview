@@ -1,0 +1,12 @@
+{
+  "name": "lumenade",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "node server/server.mjs",
+    "demo": "node scripts/demo.mjs"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

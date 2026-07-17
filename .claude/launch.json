@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "fleetview",
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["server/server.mjs"],
+      "port": 4747
+    }
+  ]
+}
