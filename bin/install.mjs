@@ -40,19 +40,29 @@ const VENDOR_WHITELIST = [
   "server",
   "public",
   "scripts",
+  "starter-agents",
   "fleet.config.json",
   "package.json",
   "README.md",
   join("docs", "FLEETVIEW-SPEC.md"),
 ];
+const STARTER_AGENTS = ["builder.md", "checker.md", "codex-runner.md"];
 
 function parseArgs(argv) {
-  const opts = { yes: false, uninstall: false, dev: null, withCodex: false, start: false };
+  const opts = {
+    yes: false,
+    uninstall: false,
+    dev: null,
+    withCodex: false,
+    withAgents: false,
+    start: false,
+  };
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
     if (arg === "--yes") opts.yes = true;
     else if (arg === "--uninstall") opts.uninstall = true;
     else if (arg === "--with-codex") opts.withCodex = true;
+    else if (arg === "--with-agents") opts.withAgents = true;
     else if (arg === "--start") opts.start = true;
     else if (arg === "--dev") {
       opts.dev = argv[++i];
@@ -196,6 +206,26 @@ function scaffoldCodexPlugin(pluginDir, hookScriptPath) {
   console.log(`  notify = ["node", "${hookScriptPath}", "codex-notify"]`);
 }
 
+// Starter agents (spec §23): copy the three genericized agent definitions into
+// ~/.claude/agents, never overwriting a file the user already has there. All
+// three are always offered — no PATH detection for codex; that's the owner's
+// call to make (or not) after the fact.
+function installStarterAgents(packageRoot, home) {
+  const srcDir = join(packageRoot, "starter-agents");
+  const destDir = join(home, ".claude", "agents");
+  mkdirSync(destDir, { recursive: true });
+  for (const file of STARTER_AGENTS) {
+    const src = join(srcDir, file);
+    const dest = join(destDir, file);
+    if (existsSync(dest)) {
+      console.log(`skipped (exists) ${dest}`);
+      continue;
+    }
+    cpSync(src, dest);
+    console.log(`written ${dest}`);
+  }
+}
+
 // Self-vendoring copy: package root -> ~/.lumenade/app.staging-<pid> -> rename
 // into place at ~/.lumenade/app. Preserves a user-modified app/fleet.config.json
 // across upgrades.
@@ -236,13 +266,15 @@ function selfVendor(packageRoot, home) {
 function printUsage() {
   console.log(
     [
-      "Usage: fleetview [--yes] [--uninstall] [--dev <repo-path>] [--with-codex] [--start]",
+      "Usage: fleetview [--yes] [--uninstall] [--dev <repo-path>] [--with-codex] [--with-agents] [--start]",
       "",
       "  --yes           non-interactive, skip confirmation",
       "  --uninstall     remove FleetView's hook entries from ~/.claude/settings.json",
       "  --dev <path>    wire hooks at an existing checkout instead of vendoring a copy",
       "  --with-codex    experimental — scaffold a Codex hooks plugin + print registration steps",
       "                  (plugin dir: <app>/codex-plugin, or ~/.lumenade/codex-plugin with --dev)",
+      "  --with-agents   copy the three starter agents (builder/checker/codex-runner) into",
+      "                  ~/.claude/agents (never overwrites a file already there)",
       "  --start         run the server in the foreground after installing",
     ].join("\n")
   );
@@ -282,6 +314,13 @@ async function main() {
     console.log(`Removed FleetView's hook entries from ${settingsPath}.`);
     console.log(`Backup kept at ${backupPath}.`);
     console.log(`To finish removal: rm -rf ${join(home, ".lumenade")}`);
+    const survivingAgents = STARTER_AGENTS.map((f) =>
+      join(home, ".claude", "agents", f)
+    ).filter(existsSync);
+    if (survivingAgents.length > 0) {
+      console.log("Starter agents left in place (yours now):");
+      for (const p of survivingAgents) console.log(`  ${p}`);
+    }
     return;
   }
 
@@ -291,6 +330,9 @@ async function main() {
     return;
   }
 
+  const __filename = fileURLToPath(import.meta.url);
+  const packageRoot = dirname(dirname(__filename));
+
   let hookScriptPath;
   let appDir = null;
   if (opts.dev) {
@@ -298,8 +340,6 @@ async function main() {
     hookScriptPath = join(devRoot, "hooks", "emit-event.mjs");
     console.log(`Wiring hooks at dev checkout: ${devRoot} (no files copied).`);
   } else {
-    const __filename = fileURLToPath(import.meta.url);
-    const packageRoot = dirname(dirname(__filename));
     const vendored = selfVendor(packageRoot, home);
     appDir = vendored.appDir;
     hookScriptPath = join(appDir, "hooks", "emit-event.mjs");
@@ -320,6 +360,10 @@ async function main() {
       ? join(appDir, "codex-plugin")
       : join(home, ".lumenade", "codex-plugin");
     scaffoldCodexPlugin(pluginDir, hookScriptPath);
+  }
+
+  if (opts.withAgents) {
+    installStarterAgents(packageRoot, home);
   }
 
   if (opts.start) {

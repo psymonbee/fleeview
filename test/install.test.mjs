@@ -22,6 +22,7 @@ import { fileURLToPath } from "node:url";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const INSTALLER = join(__dirname, "..", "bin", "install.mjs");
+const STARTER_AGENTS = ["builder.md", "checker.md", "codex-runner.md"];
 const EIGHT_EVENTS = [
   "SessionStart",
   "SessionEnd",
@@ -57,6 +58,26 @@ function backupFiles(home) {
   const claudeDir = join(home, ".claude");
   if (!existsSync(claudeDir)) return [];
   return readdirSync(claudeDir).filter((f) => f.includes("fleetview-backup"));
+}
+
+function agentsDir(home) {
+  return join(home, ".claude", "agents");
+}
+
+// Minimal frontmatter sanity check — mirrors the shape server/discovery.mjs
+// (spec §22) expects: a `---` fence, `key: value` scalar lines inside it,
+// then a closing `---` fence.
+function parseFrontmatterKeys(text) {
+  if (!text.startsWith("---\n")) return null;
+  const end = text.indexOf("\n---", 4);
+  if (end === -1) return null;
+  const body = text.slice(4, end);
+  const keys = {};
+  for (const line of body.split("\n")) {
+    const m = /^([A-Za-z_][\w-]*):\s*(.*)$/.exec(line);
+    if (m) keys[m[1]] = m[2].trim();
+  }
+  return keys;
 }
 
 describe("bin/install.mjs — fresh install", () => {
@@ -320,6 +341,106 @@ describe("bin/install.mjs — --with-codex (§18.4)", () => {
         `node ${join(devPath, "hooks", "emit-event.mjs")} codex`
       );
       assert.ok(!existsSync(join(home, ".lumenade", "app")), "still no vendored copy");
+    } finally {
+      rmSync(home, { recursive: true, force: true });
+    }
+  });
+});
+
+describe("bin/install.mjs — --with-agents (§23)", () => {
+  test("writes all 3 starter agents with parseable frontmatter and prints 'written'", () => {
+    const home = makeScratchHome();
+    try {
+      const result = runInstaller(home, ["--yes", "--with-agents"]);
+      assert.equal(result.status, 0, `stderr: ${result.stderr}`);
+
+      for (const file of STARTER_AGENTS) {
+        const dest = join(agentsDir(home), file);
+        assert.ok(existsSync(dest), `${file} written`);
+        const keys = parseFrontmatterKeys(readFileSync(dest, "utf8"));
+        assert.ok(keys, `${file} has a parseable frontmatter fence`);
+        assert.ok(keys.name, `${file} frontmatter has name`);
+        assert.ok(keys.description, `${file} frontmatter has description`);
+        assert.ok(keys.model, `${file} frontmatter has model`);
+        assert.ok(result.stdout.includes(`written ${dest}`), `stdout announces ${file} written`);
+      }
+    } finally {
+      rmSync(home, { recursive: true, force: true });
+    }
+  });
+
+  test("pre-seeded builder.md is preserved byte-identical and reported skipped; others still written", () => {
+    const home = makeScratchHome();
+    try {
+      mkdirSync(agentsDir(home), { recursive: true });
+      const sentinel = "---\nname: builder\ndescription: my own thing\nmodel: opus\n---\n\nDo not touch this.\n";
+      const builderPath = join(agentsDir(home), "builder.md");
+      writeFileSync(builderPath, sentinel);
+
+      const result = runInstaller(home, ["--yes", "--with-agents"]);
+      assert.equal(result.status, 0, `stderr: ${result.stderr}`);
+
+      assert.equal(readFileSync(builderPath, "utf8"), sentinel, "builder.md untouched byte-for-byte");
+      assert.ok(
+        result.stdout.includes(`skipped (exists) ${builderPath}`),
+        "stdout announces builder.md skipped"
+      );
+
+      for (const file of ["checker.md", "codex-runner.md"]) {
+        const dest = join(agentsDir(home), file);
+        assert.ok(existsSync(dest), `${file} still written`);
+        assert.ok(result.stdout.includes(`written ${dest}`), `stdout announces ${file} written`);
+      }
+    } finally {
+      rmSync(home, { recursive: true, force: true });
+    }
+  });
+
+  test("without the flag, ~/.claude/agents is never created", () => {
+    const home = makeScratchHome();
+    try {
+      const result = runInstaller(home, ["--yes"]);
+      assert.equal(result.status, 0, `stderr: ${result.stderr}`);
+      assert.ok(!existsSync(agentsDir(home)), "~/.claude/agents absent without --with-agents");
+    } finally {
+      rmSync(home, { recursive: true, force: true });
+    }
+  });
+
+  test("--uninstall never touches ~/.claude/agents; starter agents survive", () => {
+    const home = makeScratchHome();
+    try {
+      const install = runInstaller(home, ["--yes", "--with-agents"]);
+      assert.equal(install.status, 0, `stderr: ${install.stderr}`);
+
+      const result = runInstaller(home, ["--yes", "--uninstall"]);
+      assert.equal(result.status, 0, `stderr: ${result.stderr}`);
+
+      for (const file of STARTER_AGENTS) {
+        const dest = join(agentsDir(home), file);
+        assert.ok(existsSync(dest), `${file} survives --uninstall`);
+        assert.ok(
+          result.stdout.includes("left in place (yours now)"),
+          "stdout notes agents left in place"
+        );
+        assert.ok(result.stdout.includes(dest), `stdout names ${file}'s path`);
+      }
+    } finally {
+      rmSync(home, { recursive: true, force: true });
+    }
+  });
+
+  test("vendored ~/.lumenade/app contains starter-agents/ with all 3 files", () => {
+    const home = makeScratchHome();
+    try {
+      const result = runInstaller(home, ["--yes"]);
+      assert.equal(result.status, 0, `stderr: ${result.stderr}`);
+
+      const vendoredDir = join(home, ".lumenade", "app", "starter-agents");
+      assert.ok(existsSync(vendoredDir), "starter-agents/ vendored");
+      for (const file of STARTER_AGENTS) {
+        assert.ok(existsSync(join(vendoredDir, file)), `${file} vendored`);
+      }
     } finally {
       rmSync(home, { recursive: true, force: true });
     }
