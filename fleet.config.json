@@ -1,8 +1,6 @@
 {
   "hub": { "title": "Orchestrator" },
   "agents": {
-    "builder":      { "label": "Builder",        "model": "Claude Sonnet 5", "provider": "anthropic" },
-    "checker":      { "label": "Checker",        "model": "Claude Opus 4.8", "provider": "anthropic" },
     "codex-runner": { "label": "Codex relay",    "model": "OpenAI Codex",    "provider": "openai" },
     "codex-direct": { "label": "Codex (direct)", "model": "OpenAI Codex",    "provider": "openai" }
   },
@@ -11,6 +9,10 @@
     "claude-fable-5": "Claude Fable 5", "claude-opus-4-8": "Claude Opus 4.8",
     "claude-sonnet-5": "Claude Sonnet 5", "claude-haiku-4-5": "Claude Haiku 4.5",
     "gpt-5.5": "GPT-5.5"
+  },
+  "modelAliases": {
+    "sonnet": "claude-sonnet-5", "opus": "claude-opus-4-8",
+    "haiku": "claude-haiku-4-5", "fable": "claude-fable-5"
   },
   "stallThresholdMs": 120000,
   "narration": { "enabled": false, "model": "haiku", "debounceMs": 15000,

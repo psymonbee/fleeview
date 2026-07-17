@@ -16,6 +16,8 @@ import {
 import { open as fsOpen } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { homedir } from "node:os";
+import { scanAgentDir } from "./discovery.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PUBLIC_DIR = path.resolve(__dirname, "..", "public");
@@ -54,6 +56,15 @@ const DEFAULT_CONFIG = {
     "claude-sonnet-5": "Claude Sonnet 5",
     "claude-haiku-4-5": "Claude Haiku 4.5",
   },
+  // Bare aliases (as agent frontmatter uses, e.g. `model: sonnet`) resolved
+  // to a canonical model id before modelNames prettification (§22).
+  // `inherit` and unknown aliases pass through untouched.
+  modelAliases: {
+    sonnet: "claude-sonnet-5",
+    opus: "claude-opus-4-8",
+    haiku: "claude-haiku-4-5",
+    fable: "claude-fable-5",
+  },
   stallThresholdMs: 120000,
   narration: {
     enabled: false,
@@ -79,23 +90,53 @@ const DEFAULT_CONFIG = {
   },
 };
 
+// Returns { config, fileAgents }: `config` is the usual shallow merge over
+// DEFAULT_CONFIG; `fileAgents` is the on-disk file's own `agents` map (or
+// `null` if the file didn't provide one) -- resolveAgentMeta (§22) needs to
+// tell "explicit user-file config.agents entry" apart from DEFAULT_CONFIG's
+// built-in `agents`, which a plain shallow merge collapses into one.
 function loadConfig() {
+  let fileConfig = null;
   try {
     const raw = readFileSync(CONFIG_PATH, "utf8");
     const parsed = JSON.parse(raw);
     if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
-      return { ...DEFAULT_CONFIG, ...parsed };
+      fileConfig = parsed;
     }
   } catch {
     // Missing or corrupt — fall through to defaults, still boots.
   }
-  return { ...DEFAULT_CONFIG };
+  const config = fileConfig ? { ...DEFAULT_CONFIG, ...fileConfig } : { ...DEFAULT_CONFIG };
+  const fileAgents =
+    fileConfig && Object.prototype.hasOwnProperty.call(fileConfig, "agents") ? fileConfig.agents : null;
+  return { config, fileAgents };
 }
 
-const config = loadConfig();
+const { config, fileAgents: fileConfigAgents } = loadConfig();
 
 // ---------------------------------------------------------------------------
-// Agent metadata resolution (§10 resolveAgentMeta)
+// Agent auto-discovery (§22) -- user-level scanned once at boot; project-
+// level re-scanned per session.start (rare event; that IS the entire cadence
+// story, no watchers). Project-level entries shadow user-level ones by name.
+// homedir() (not process.env.HOME directly) is the test seam: tests spawn
+// this server with a scratch HOME so boot-scan hits a scratch agents dir.
+// ---------------------------------------------------------------------------
+
+const discoveredUserAgents = scanAgentDir(path.join(homedir(), ".claude", "agents"));
+/** @type {Map<string, object>} sessionId -> discovered project-level agents */
+let discoveredProjectAgents = new Map();
+
+function lookupDiscovered(agentType, sessionId) {
+  const project = sessionId ? discoveredProjectAgents.get(sessionId) : null;
+  if (project && Object.prototype.hasOwnProperty.call(project, agentType)) return project[agentType];
+  if (Object.prototype.hasOwnProperty.call(discoveredUserAgents, agentType)) {
+    return discoveredUserAgents[agentType];
+  }
+  return null;
+}
+
+// ---------------------------------------------------------------------------
+// Agent metadata resolution (§22 resolveAgentMeta, amends §10)
 // ---------------------------------------------------------------------------
 
 // Trailing date-suffix on model ids, e.g. "claude-opus-4-8-20260201".
@@ -117,14 +158,61 @@ function prettifyModel(modelId) {
   return modelId; // raw id — no match anywhere
 }
 
-// event model (prettified) > config.agents[agentType] > {label: agentType, ...fallbackAgent}
-function resolveAgentMeta(agentType, eventModel) {
-  const agents = config.agents || {};
-  const base = Object.prototype.hasOwnProperty.call(agents, agentType)
-    ? agents[agentType]
-    : { label: agentType, ...(config.fallbackAgent || {}) };
+// Bare alias (agent frontmatter's `model: sonnet`) -> canonical model id,
+// resolved *before* prettifyModel. `inherit`/unknown aliases pass through.
+function resolveModelAlias(modelId) {
+  if (typeof modelId !== "string" || modelId === "") return modelId;
+  const aliases = config.modelAliases || {};
+  return Object.prototype.hasOwnProperty.call(aliases, modelId) ? aliases[modelId] : modelId;
+}
+
+// Provider inference for discovered agents: "anthropic" unless the
+// alias-resolved model id starts gpt/o[0-9]/codex -> "openai".
+const OPENAI_MODEL_RE = /^(gpt|o[0-9]|codex)/;
+function inferProvider(resolvedModelId) {
+  if (typeof resolvedModelId === "string" && OPENAI_MODEL_RE.test(resolvedModelId)) return "openai";
+  return "anthropic";
+}
+
+// Precedence (§22, replacing §10's 3-step):
+// 1. event model, alias-resolved then prettified -- overrides whichever
+//    base tier below supplies label/provider/model, always on top;
+// 2. else user-file config.agents[agentType] (fileConfigAgents: an agents
+//    map actually present in the on-disk fleet.config.json);
+// 3. else discovered entry (project-level, then user-level), model
+//    alias-resolved + prettified, provider inferred;
+// 4. else built-in default agents entry (DEFAULT_CONFIG.agents, kept at all
+//    four entries so the demo and preserved v3 configs render identically);
+// 5. else {label: agentType, ...fallbackAgent} -- with the codex exception:
+//    a `codex:`-prefixed sessionId gets fallback provider "openai".
+function resolveAgentMeta(agentType, eventModel, sessionId) {
+  let base;
+  if (fileConfigAgents && Object.prototype.hasOwnProperty.call(fileConfigAgents, agentType)) {
+    base = fileConfigAgents[agentType];
+  } else {
+    const discovered = lookupDiscovered(agentType, sessionId);
+    if (discovered) {
+      const resolvedModelId =
+        discovered.model !== undefined ? resolveModelAlias(discovered.model) : undefined;
+      base = {
+        label: discovered.label,
+        provider: inferProvider(resolvedModelId),
+        model: resolvedModelId !== undefined ? prettifyModel(resolvedModelId) : undefined,
+      };
+    } else if (Object.prototype.hasOwnProperty.call(DEFAULT_CONFIG.agents, agentType)) {
+      base = DEFAULT_CONFIG.agents[agentType];
+    } else {
+      const isCodexSession = typeof sessionId === "string" && sessionId.startsWith("codex:");
+      base = {
+        label: agentType,
+        ...(config.fallbackAgent || {}),
+        ...(isCodexSession ? { provider: "openai" } : {}),
+      };
+    }
+  }
+
   const meta = { label: base.label, provider: base.provider, model: base.model };
-  if (eventModel) meta.model = prettifyModel(eventModel);
+  if (eventModel) meta.model = prettifyModel(resolveModelAlias(eventModel));
   return meta;
 }
 
@@ -161,6 +249,7 @@ function resetState() {
   agentLogs = new Map();
   openCalls = new Map();
   exactPending = new Map();
+  discoveredProjectAgents = new Map();
 }
 
 function clip(str, max) {
@@ -395,6 +484,11 @@ function applyEvent(evt) {
       session.turnActive = false;
       session.ended = false;
       session.transcriptPath = evt.transcriptPath ?? session.transcriptPath;
+      // §22: re-scan project-level agent discovery on every session.start
+      // (rare event -- that's the entire re-scan cadence, no watchers).
+      if (typeof session.cwd === "string" && session.cwd) {
+        discoveredProjectAgents.set(sessionId, scanAgentDir(path.join(session.cwd, ".claude", "agents")));
+      }
       broadcast({ type: "session", session });
       break;
     }
@@ -479,7 +573,7 @@ function applyEvent(evt) {
       let rawModel = evt.model;
       if (rawModel === undefined && exact) rawModel = exact.model;
 
-      const meta = resolveAgentMeta(agentType, rawModel);
+      const meta = resolveAgentMeta(agentType, rawModel, sessionId);
 
       let agent = agents.get(agentId);
       if (!agent) {
@@ -502,7 +596,7 @@ function applyEvent(evt) {
           finalMessage: null,
           narrative: null,
           narrativeAt: null,
-          transcriptPath: null,
+          transcriptPath: evt.transcriptPath ?? null, // §28b
           tokens: null,
           costUsd: null,
         };
@@ -514,6 +608,7 @@ function applyEvent(evt) {
         agent.description = description ?? agent.description;
         agent.status = "running";
         agent.lastActivityAt = t;
+        if (evt.transcriptPath !== undefined) agent.transcriptPath = evt.transcriptPath; // §28b
       }
 
       agent.stepId = matchPlanStep(sessionId, agent.description);
