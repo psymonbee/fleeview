@@ -720,7 +720,45 @@ PreToolUsePermissionRequest), runs via `codex exec --json
 `notify` "turn-ended" shape. Findings recorded below (S2 notes), fixtures
 committed, sanitized of anything secret-like.
 
-**S2 findings:** _pending — filled in when the probe completes._
+**S2 findings (probe run 2026-07-17, Codex CLI 0.144.5 — full notes in
+`test/fixtures/codex/PROBE-NOTES.md`):**
+
+- **Hooks are plugin-gated.** `codex exec` fired zero hooks across four
+  project-local hooks.json wirings (with `--dangerously-bypass-hook-trust`).
+  Working hooks.json files exist only inside installed-plugin packages;
+  registration (`codex plugin add`) is a persistent, account-linked change —
+  a USER action, never an agent's. Consequence: **no runtime hook payloads
+  were captured; none are faked.**
+- **The binary embeds draft-07 JSON Schemas for all hook payloads** —
+  extracted verbatim to `test/fixtures/codex/schemas/*.json`. Authoritative
+  for field names/types/required lists (not example values). The real event
+  set is **10 events**: PreToolUse, PermissionRequest (own event — the
+  earlier "PreToolUsePermissionRequest" was a strings-dump misread),
+  PostToolUse, PreCompact, PostCompact, SessionStart, **UserPromptSubmit**,
+  SubagentStart, SubagentStop, **Stop**. So Codex has real turn boundaries.
+- Field names are deliberately Claude-Code-compatible: `session_id`,
+  `tool_name`, `tool_input`, `tool_use_id`, `tool_response`, `agent_id`,
+  `agent_type`, `agent_transcript_path`, `last_assistant_message`,
+  `transcript_path`, plus Codex-only `turn_id`; `permission_mode` uses
+  Claude Code's exact enum. Hook env carries `CLAUDE_PLUGIN_ROOT`-style
+  duplicates — drop-in compatibility is clearly intentional.
+- **notify works without any plugin** (top-level config key, `-c`
+  overridable): payload delivered as one JSON-encoded argv arg, kebab-case
+  fields — live-captured fixture `notify-turn-ended.json`:
+  `{type: "agent-turn-complete", "thread-id", "turn-id", cwd,
+  "input-messages", "last-assistant-message"}`.
+- Failure semantics unobserved (no hooks fired); `codex exec` may lack an
+  interactive-approval path entirely (no `-a` flag on exec), so
+  PermissionRequest may never fire in exec mode.
+- `codex exec --json` stdout carries usage on `turn.completed`
+  (`.usage.{input_tokens, cached_input_tokens, output_tokens,
+  reasoning_output_tokens}`) — future `agent.usage` source, out of v3 scope.
+
+**Gate disposition:** field names are verified (binary schemas = the wire
+contract), so the adapter is built against them with fixtures labelled
+`-SYNTHETIC` (schema-exact shapes, fabricated values — same convention as
+v2's `pre-exitplanmode-SYNTHETIC.json`). Live hook validation is deferred
+until the USER wires the plugin; Codex support ships as **experimental**.
 
 ### 18.2 `adapters/codex.mjs`
 
@@ -733,30 +771,52 @@ collisions in the shared events file are impossible; reducer, SSE, log
 endpoint, and UI are untouched. Truncation limits as §9. Local private
 helpers (truncate etc.) — adapters stay standalone, no shared module.
 
-### 18.3 Mapping table (DRAFT — hypothesis until S2 fills §18.1)
+### 18.3 Mapping table (FINAL — field names per §18.1 schemas; `ns(x)` = `"codex:" + x`)
+
+All events: `sessionId = ns(session_id)`, `source: "codex"`. Truncation
+limits as §9.
 
 | Codex hook event | Neutral event |
 |---|---|
-| SessionStart | `session.start {cwd?}` |
-| SubagentStart / SubagentStop | `agent.start` / `agent.end` |
-| PreToolUse / PostToolUse (agent-attributable) | `agent.activity` phase start/end |
-| PreToolUsePermissionRequest | `agent.activity {hint: "awaiting permission…"}` |
-| PreCompact / PostCompact | `[]` (v3) |
-| notify "turn-ended" | `turn.end` (via `codex-notify` dispatch mode) |
+| SessionStart | `session.start {cwd, transcriptPath: transcript_path}` |
+| UserPromptSubmit | `turn.start` |
+| Stop | `turn.end` |
+| SubagentStart | `agent.start {agentId: ns(agent_id), agentType: agent_type, model}` |
+| SubagentStop | `agent.end {agentId: ns(agent_id), agentType: agent_type, finalMessage: truncate(last_assistant_message, 300), transcriptPath: agent_transcript_path}` |
+| PreToolUse **with** `agent_id` | `agent.activity {agentId: ns(agent_id), phase: "start", callId: tool_use_id, tool: tool_name, hint, file}` (hint/file rules as §9) |
+| PostToolUse **with** `agent_id` | `agent.activity {agentId: ns(agent_id), phase: "end", callId: tool_use_id, tool: tool_name}` |
+| PreToolUse / PostToolUse without `agent_id` | `[]` (main-loop calls not rendered — parity with §9) |
+| PermissionRequest | `[]` (v3 — carries no `tool_use_id`, likely never fires in exec mode) |
+| PreCompact / PostCompact | `[]` |
+| notify payload `type: "agent-turn-complete"` | `turn.end` for `sessionId: ns(thread-id)` (any other notify type → `[]`) |
 
-Codex has no Stop/SessionEnd/UserPromptSubmit hooks — `turnActive` for
-codex sessions is best-effort via notify and declared non-blocking (UI
-tolerates it; hub just doesn't pulse).
+No SessionEnd hook exists — codex sessions rely on the 24 h idle prune.
+Known cosmetic limitation: `resolveAgentMeta` has no provider notion per
+model, so codex agents fall back to config/`fallbackAgent` provider unless
+the user adds `config.agents` entries for Codex agent types; `modelNames`
+gains a `"gpt-5.5"` prettifier entry.
 
 ### 18.4 Hook dispatch — `hooks/emit-event.mjs`
 
 Adapter selected by `process.argv[2]` against a hardcoded whitelist:
 `claude-code` (default when the arg is missing — the live wiring keeps
 working with zero settings changes), `codex` (stdin payload), and
-`codex-notify` (payload from `process.argv[3]`, notify passes args not
-stdin — exact shape per S2). Unknown arg → silent exit 0. FLEET_IGNORE
-guard unchanged and checked first. The rewrite of this LIVE file is a
-single atomic Write followed immediately by `node --check`.
+`codex-notify` (payload is the **last argv argument**, a JSON-encoded
+string — S2-verified; notify never uses stdin). Unknown arg → silent exit
+0. FLEET_IGNORE guard unchanged and checked first. The rewrite of this
+LIVE file is a single atomic Write followed immediately by `node --check`.
+
+**Wiring reality (per §18.1):** hooks require an installed Codex plugin.
+The installer's `--with-codex` therefore (a) scaffolds a plugin package at
+`<app>/codex-plugin/` — `.codex-plugin/plugin.json` manifest +
+`hooks.json` wiring the 10 events to `node <app>/hooks/emit-event.mjs
+codex` — and (b) **prints** the registration instructions
+(`codex plugin marketplace add` / `codex plugin add`) plus the no-plugin
+alternative: add
+`notify = ["node", "<app>/hooks/emit-event.mjs", "codex-notify"]` to
+`~/.codex/config.toml` for turn-boundary capture only. The installer never
+runs `codex` commands and never edits `~/.codex/*` — registration is
+explicitly the user's action (persistent, account-linked).
 
 ## 19. Token/cost enrichment
 
@@ -874,9 +934,15 @@ symptom if §19.2's no-bump rule breaks).
    exactly match an independent dedupe-sum of the same transcript.
 6. Live plan rail: a task created by a subagent shows its real subject —
    no "(untitled step)".
-7. Codex e2e: a wired test project produces `source:"codex"` events with
-   `codex:`-prefixed ids that render alongside a concurrent claude-code
-   session without collision.
+7. Codex (two tiers, per §18.1's gate disposition): **(a) automated —**
+   piping every `-SYNTHETIC` codex fixture and the live-captured notify
+   fixture through `node hooks/emit-event.mjs codex|codex-notify` yields
+   `source:"codex"` events with `codex:`-prefixed ids that a 48xx test
+   server reduces and renders without colliding with a claude-code
+   session's ids; **(b) deferred (USER-wired plugin) —** a real
+   `codex exec` run under the registered plugin produces live events that
+   render in the UI. (b) is not a v3 ship-blocker; Codex support is
+   labelled experimental until it passes.
 8. Installer vs scratch HOME: fresh install writes 8 entries with `".*"`
    matchers and a populated app dir whose copied hook passes `node
    --check`; merge preserves sentinel keys + foreign hooks; re-run is

@@ -1,0 +1,23 @@
+{
+  "_note": "Codex's `notify` mechanism delivers its payload as a single JSON-encoded command-line argument, not on stdin. This fixture captures the raw invocation our probe script observed: argv[0] was our own injected marker (\"NOTIFY\"), argv[1] is the JSON string Codex appended. `_parsed` is that string parsed for readability; it is not a separate thing Codex sent.",
+  "__argv": [
+    "NOTIFY",
+    "{\"type\":\"agent-turn-complete\",\"thread-id\":\"019f6dea-3ae6-7111-be5c-94005ae61023\",\"turn-id\":\"019f6dea-3b37-7061-a483-c9a71a913997\",\"cwd\":\"/private/tmp/claude-501/-Users-simon-lumenADE/6c8f0e3f-1031-4f40-8491-749526a75347/scratchpad/codex-probe/scratch-project\",\"client\":\"codex_exec\",\"input-messages\":[\"Run `echo hello-notify`. Nothing else.\"],\"last-assistant-message\":\"hello-notify\"}"
+  ],
+  "_parsed": {
+    "type": "agent-turn-complete",
+    "thread-id": "019f6dea-3ae6-7111-be5c-94005ae61023",
+    "turn-id": "019f6dea-3b37-7061-a483-c9a71a913997",
+    "cwd": "/private/tmp/claude-501/-Users-simon-lumenADE/6c8f0e3f-1031-4f40-8491-749526a75347/scratchpad/codex-probe/scratch-project",
+    "client": "codex_exec",
+    "input-messages": [
+      "Run `echo hello-notify`. Nothing else."
+    ],
+    "last-assistant-message": "hello-notify"
+  },
+  "_capture": {
+    "invocation": "codex exec --json --skip-git-repo-check -c 'notify=[\"node\",\"<abs>/capture.mjs\",\"NOTIFY\"]' \"Run `echo hello-notify`. Nothing else.\"",
+    "observedAt": "2026-07-17T02:31:41.069Z",
+    "source": "genuinely captured from a live `codex exec` run; not synthesized"
+  }
+}
