@@ -623,3 +623,269 @@ event on stdout. Storyline (~60 s):
    spawning a subagent renders in the UI; if the session creates tasks via
    TaskCreate/TaskUpdate, the plan rail populates with exact step ids;
    `FLEET_IGNORE=1 claude -p "hi"` writes nothing to the events file.
+
+---
+
+# FleetView v3 — amendment (2026-07-17)
+
+v3 adds: publication + npx installer (§17), a Codex CLI adapter behind an
+argv dispatch (§18), token/cost enrichment from transcripts (§19), and
+carried-over fixes (§20). Constraints unchanged: zero npm dependencies,
+Node ≥ 20 ESM, hook is a pure observer (always exit 0), single-file UI with
+no external requests, SSE full-record upserts by id, reducer trusts `evt.t`.
+
+## 17. Publication & npx installer
+
+### 17.1 Pre-publication sweep (run before the repo flips public)
+
+Results recorded here when executed:
+
+- Full-history secrets grep (`api[_-]?key|token|secret|password|sk-ant|ghp_|
+  AKIA|PRIVATE KEY` etc.) — **run 2026-07-17: clean** (all hits are matcher
+  code / design tokens / usage-token fields).
+- Author identity `Simon Beesley <psymonbeesley@gmail.com>` becomes public —
+  accepted (Simon's call; history rewrite declined as needless).
+- `test/fixtures/*.json` keep their `/Users/simon/...` paths and session
+  UUIDs verbatim: they are empirically captured contract data asserted by
+  tests; scrubbing would falsify the record. No secrets in them (verified).
+- README fully genericized (no machine-specific paths). Spec §1–§16 stays
+  verbatim as the historical contract; paths in it are from the original dev
+  machine. `docs/V3-BOOTSTRAP.md` likewise historical.
+- The visibility flip itself is a USER action (`gh repo edit`), never an
+  agent's.
+
+### 17.2 Installer contract — `bin/install.mjs`
+
+Run as `npx github:psymonbee/fleeview` (bin name `fleetview`). Zero-dep,
+shebang `#!/usr/bin/env node`, ~250 lines. All home-relative paths derive
+from `os.homedir()` (the test seam — tests run with a scratch `HOME`).
+
+**Self-vendoring copy** (npx cache is ephemeral; hooks need a stable
+absolute path): the bin resolves its package root via `import.meta.url`,
+copies the whitelist `hooks/ adapters/ server/ public/ scripts/
+fleet.config.json package.json README.md docs/FLEETVIEW-SPEC.md` to
+`~/.lumenade/app.staging-<pid>` (`fs.cpSync` recursive), then removes any
+old `~/.lumenade/app` and renames staging into place. Re-run = upgrade.
+Exception: if the existing `app/fleet.config.json` differs from the bundled
+default, the user's copy is preserved (notice printed).
+
+**Settings merge** into `~/.claude/settings.json`:
+1. Missing file → create with just the hooks block. Unparseable JSON →
+   **abort with a message, touch nothing** (exit non-zero).
+2. Back up to `~/.claude/settings.json.fleetview-backup-<ISO>`.
+3. For each of the 8 events (SessionStart, SessionEnd, UserPromptSubmit,
+   Stop, SubagentStart, SubagentStop, PreToolUse, PostToolUse): remove any
+   existing entry whose command contains `/hooks/emit-event.mjs`
+   (dedupe/upgrade), then append
+   `{"matcher": ".*"` (Pre/PostToolUse only) `, "hooks": [{"type":
+   "command", "command": "node <app>/hooks/emit-event.mjs", "timeout": 5}]}`
+   — `".*"` matches the verified live shape (README v2 showed `""`; the
+   installer emits `".*"`).
+4. All other top-level keys and all non-FleetView hook entries preserved
+   untouched. Write via temp file + rename. Key order may change
+   (documented as acceptable).
+
+**Flags:** `--yes` (non-interactive; without it and with a TTY, plain-text
+confirm), `--uninstall` (remove all hook entries containing
+`/hooks/emit-event.mjs`, print `rm -rf ~/.lumenade` instructions, leave
+backups), `--dev <repo-path>` (wire hooks at a checkout instead of copying
+— what the dev machine uses), `--with-codex` (also wire Codex hooks per
+§18.4; prints "experimental"), `--start` (run the server foreground after
+install; no daemonization — README documents launchd as a user option).
+
+**package.json:** name → `"fleetview"`, add
+`"bin": {"fleetview": "bin/install.mjs"}` and `"test": "node --test"`
+(bare — `node --test test/` dir form breaks on Node 22). `"private": true`
+stays (blocks registry publish only; git installs unaffected).
+
+### 17.3 Removal
+
+`npx github:psymonbee/fleeview --uninstall` (or hand-delete the 8 hook
+entries), then `rm -rf ~/.lumenade`. Backups under `~/.claude/` are left
+for the user. No other machine state exists.
+
+## 18. Codex CLI adapter
+
+### 18.1 S2 probe gate
+
+`adapters/codex.mjs` may not be written until this section's §18.3 mapping
+contains only field names verified from captured payloads
+(`test/fixtures/codex/`). Probe procedure: scratch project (never the real
+`~/.codex/config.toml` — use `-c` CLI config overrides), a capture script
+wired for all 8 Codex hook events (PreToolUse, PostToolUse, PreCompact,
+PostCompact, SessionStart, SubagentStart, SubagentStop,
+PreToolUsePermissionRequest), runs via `codex exec --json
+--dangerously-bypass-hook-trust` covering: trivial task, failing command
+(does failure emit PostToolUse?), subagent spawn, permission request,
+`notify` "turn-ended" shape. Findings recorded below (S2 notes), fixtures
+committed, sanitized of anything secret-like.
+
+**S2 findings:** _pending — filled in when the probe completes._
+
+### 18.2 `adapters/codex.mjs`
+
+`export function translate(payload, now = new Date()) → NeutralEvent[]`,
+same contract as §9: stateless, pure, never throws, `[]` on
+malformed/unwanted input. `source: "codex"`. **Id namespacing:**
+`sessionId = "codex:" + raw` always; `agentId = "codex:" + raw` whenever
+non-null. Applied uniformly at the adapter boundary so cross-harness id
+collisions in the shared events file are impossible; reducer, SSE, log
+endpoint, and UI are untouched. Truncation limits as §9. Local private
+helpers (truncate etc.) — adapters stay standalone, no shared module.
+
+### 18.3 Mapping table (DRAFT — hypothesis until S2 fills §18.1)
+
+| Codex hook event | Neutral event |
+|---|---|
+| SessionStart | `session.start {cwd?}` |
+| SubagentStart / SubagentStop | `agent.start` / `agent.end` |
+| PreToolUse / PostToolUse (agent-attributable) | `agent.activity` phase start/end |
+| PreToolUsePermissionRequest | `agent.activity {hint: "awaiting permission…"}` |
+| PreCompact / PostCompact | `[]` (v3) |
+| notify "turn-ended" | `turn.end` (via `codex-notify` dispatch mode) |
+
+Codex has no Stop/SessionEnd/UserPromptSubmit hooks — `turnActive` for
+codex sessions is best-effort via notify and declared non-blocking (UI
+tolerates it; hub just doesn't pulse).
+
+### 18.4 Hook dispatch — `hooks/emit-event.mjs`
+
+Adapter selected by `process.argv[2]` against a hardcoded whitelist:
+`claude-code` (default when the arg is missing — the live wiring keeps
+working with zero settings changes), `codex` (stdin payload), and
+`codex-notify` (payload from `process.argv[3]`, notify passes args not
+stdin — exact shape per S2). Unknown arg → silent exit 0. FLEET_IGNORE
+guard unchanged and checked first. The rewrite of this LIVE file is a
+single atomic Write followed immediately by `node --check`.
+
+## 19. Token/cost enrichment
+
+### 19.1 State additions
+
+`Session` gains `transcriptPath` (from `session.start`, previously
+dropped), `tokens`, `costUsd`. `AgentRun` gains `transcriptPath` (from
+`agent.end`, authoritative when present), `tokens
+{in, out, cacheRead, cacheWrite}`, `costUsd`. All default `null`; included
+in snapshots and upserts.
+
+### 19.2 New neutral kind `agent.usage`
+
+`{agentId: string | null, tokens {in, out, cacheRead, cacheWrite},
+costUsd?}` — `agentId: null` applies to the Session (broadcast
+`{type: "session", session}`), else to that AgentRun (broadcast
+`{type: "agent", agent}`). Upsert semantics. **MUST NOT bump
+`lastActivityAt`** at either session or agent level — token bookkeeping
+must never mask a stall (the top-of-`applyEvent` freshness bump becomes
+conditional on `kind !== "agent.usage"`). Emitted by the demo (explicit
+`costUsd`) and available to future sources (`codex exec --json` carries
+token counts); the server-side enricher (§19.3) writes state directly via
+callback and never appends to the events file.
+
+### 19.3 Enricher sidecar — `server/enrich.mjs`
+
+`createEnricher({config, getTargets, onUsage}) → {tick(), forget(key)}` —
+DI factory like the narrator, never throws. Server arms it only when
+`config.enrichment.enabled`, ticking every `intervalMs` (default 5000).
+
+Targets (server-provided): running agents with a resolvable transcript
+path — own `transcriptPath`, else derived
+`dirname(session.transcriptPath)/<sessionId>/subagents/agent-<agentId>.jsonl`
+(convention verified on disk 2026-07-17), gated on `existsSync` (which
+naturally excludes demo/codex agents); agents ended < 60 s ago (final
+sweep); sessions with a transcriptPath active < 10 min ago (main
+transcript → session/hub tokens).
+
+Per-path state: byte offset + partial-line buffer + per-message Map. Reads
+are incremental, capped 1 MiB/file/tick. Per line: keep
+`type === "assistant"` with `message.usage`; drop
+`message.model === "<synthetic>"`. **Dedupe by `message.id`, last
+occurrence wins** — transcripts repeat assistant lines per content block
+with the same id, and the final line carries the true `output_tokens`
+(verified 2026-07-17: one message read 10 then 54065; naive summing
+overcounts ~5×). Totals and cost recomputed from the map; on change →
+`onUsage(key, tokens, costUsd)` → server sets fields + broadcasts (no
+`lastActivityAt` bump). Cost computed per message from that line's
+`message.model` (handles mixed-model transcripts); lookup: exact id →
+strip trailing date suffix → longest prefix; unknown model → tokens still
+reported, `costUsd` stays null. `forget(key)` on prune.
+
+### 19.4 Pricing config (fleet.config.json + built-in default)
+
+```json
+"enrichment": {
+  "enabled": true, "intervalMs": 5000,
+  "pricing": {
+    "claude-fable-5":  { "in": 10, "out": 50, "cacheRead": 1,   "cacheWrite": 12.5  },
+    "claude-opus-4-8": { "in": 5,  "out": 25, "cacheRead": 0.5, "cacheWrite": 6.25  },
+    "claude-sonnet-5": { "in": 3,  "out": 15, "cacheRead": 0.3, "cacheWrite": 3.75  },
+    "claude-haiku-4-5":{ "in": 1,  "out": 5,  "cacheRead": 0.1, "cacheWrite": 1.25  }
+  }
+}
+```
+
+USD per MTok, verified against current API pricing 2026-07-17 (cache read
+= 0.1× input; 5-minute cache write = 1.25× input). All cache writes are
+priced at the 5-minute rate — transcripts don't distinguish 5m/1h writes —
+hence every $ figure is labelled "est." (Sonnet 5 also has $2/$10 intro
+pricing through 2026-08-31; README footnotes both.) Shallow config merge
+as ever: a user `enrichment` block replaces the whole default.
+
+### 19.5 UI
+
+Cards: compact badge next to the model pill — `fmtTokens(in+out)` (`999`,
+`12.4k`, `1.2M`), hidden when `tokens == null`, full breakdown in `title`.
+Drawer: 4 rows (in / out / cache read / cache write) + `est. $X.XXXX` when
+`costUsd != null`. Hub: session-level badge from the active session.
+Nothing new resets in `replaceSnapshot()` — tokens ride on records. All
+§13 behaviors must survive; stall rendering especially (it is the visible
+symptom if §19.2's no-bump rule breaks).
+
+## 20. Carried-over fixes
+
+- `.layout` gains `overflow-x: clip` (kills the drawer's 360px invisible
+  scrollWidth contribution).
+- `npm test` script (bare `node --test`).
+- **Plan-step subject backfill:** in `adapters/claude-code.mjs`, the
+  `hasAgentId` branches for TaskUpdate (Pre) and TaskCreate (Post) emit the
+  `plan.step` event **in addition to** the `agent.activity` — task lists
+  are session-shared, so subagent-created steps belong on the rail with
+  real subjects. This is the actual cause of "(untitled step)" rows: the
+  agent_id branch won and the subject-carrying step event was never
+  emitted. Step-mapping logic is extracted into helpers and reused; no
+  other mapping changes.
+
+## 21. v3 acceptance criteria
+
+1. `node --check` every `.mjs` incl. `bin/install.mjs`; `npm test` green
+   (v2 suite + codex adapter + hook dispatch + enrich + reducer-usage).
+   All tests use scratch `FLEET_EVENTS_FILE`, scratch `HOME`, ports 48xx.
+2. Back-compat: the no-arg hook behaves identically to v2 for claude-code
+   payloads — the live settings.json needs no change on upgrade.
+3. `npm run demo -- --fast` + fresh SSE connect: all §16.4 criteria still
+   hold, plus demo-b1 `tokens` with `in+out ≥ 96k` and non-null `costUsd`,
+   session-level tokens present, and **demo-s1 still renders stalled**
+   (proves §19.2's no-bump rule).
+4. UI vs demo: tokens badges on cards, drawer breakdown + est. $, hub
+   session badge; `document.documentElement.scrollWidth === clientWidth`
+   with the drawer open; zero console errors; zero external URLs; §16.5
+   behaviors intact.
+5. Live enrichment: a real session spawning a subagent shows a growing
+   badge while running (≤ ~10 s lag) and a final sweep after stop; totals
+   exactly match an independent dedupe-sum of the same transcript.
+6. Live plan rail: a task created by a subagent shows its real subject —
+   no "(untitled step)".
+7. Codex e2e: a wired test project produces `source:"codex"` events with
+   `codex:`-prefixed ids that render alongside a concurrent claude-code
+   session without collision.
+8. Installer vs scratch HOME: fresh install writes 8 entries with `".*"`
+   matchers and a populated app dir whose copied hook passes `node
+   --check`; merge preserves sentinel keys + foreign hooks; re-run is
+   idempotent (no duplicate entries); corrupt settings → abort, file
+   untouched; `--uninstall` removes only FleetView entries; backup exists
+   and parses.
+9. Regressions: `FLEET_IGNORE=1 claude -p "hi"` writes nothing; narrator
+   flag off → zero `claude` spawns; corrupt `fleet.config.json` boots on
+   defaults including the enrichment block.
+10. Publication (USER steps): sweep §17.1 all-pass; README has no
+    machine paths; repo public; `npx github:psymonbee/fleeview` works from
+    a clean HOME.
