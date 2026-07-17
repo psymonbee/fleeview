@@ -1,0 +1,302 @@
+<title>FleetView — how it all works</title>
+<style>
+  /* ── FleetView's own design world: dark canvas, dot grid, node cards ──
+     Deliberately single-theme: the explainer lives in the product's visual
+     world (a dark mission-control canvas), so it commits to it. */
+  :root {
+    --bg: #0A0C10;
+    --card: #151A23;
+    --card-2: #10141B;
+    --border: #232B38;
+    --text: #E6EAF2;
+    --muted: #8B94A7;
+    --anthropic: #D97757;
+    --teal: #19C29D;
+    --done: #7BC47F;
+    --amber: #E8A23D;
+    --error: #E5484D;
+    --radius: 16px;
+    --sans: -apple-system, "SF Pro Text", "Segoe UI", system-ui, sans-serif;
+    --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  }
+  html { scroll-behavior: smooth; }
+  @media (prefers-reduced-motion: reduce) {
+    html { scroll-behavior: auto; }
+    * { animation: none !important; transition: none !important; }
+  }
+  body {
+    background: var(--bg);
+    background-image: radial-gradient(rgba(255,255,255,.05) 1px, transparent 1px);
+    background-size: 24px 24px;
+    color: var(--text);
+    font-family: var(--sans);
+    line-height: 1.6;
+    margin: 0;
+  }
+  .deck { max-width: 880px; margin: 0 auto; padding: 0 24px; }
+  .slide {
+    padding: 88px 0 72px;
+    border-bottom: 1px solid var(--border);
+  }
+  .slide:last-child { border-bottom: none; }
+  .eyebrow {
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: .18em;
+    text-transform: uppercase;
+    color: var(--anthropic);
+    margin: 0 0 14px;
+  }
+  h1, h2 { text-wrap: balance; letter-spacing: -.02em; }
+  h1 { font-size: clamp(34px, 6vw, 52px); line-height: 1.12; margin: 0 0 18px; font-weight: 750; }
+  h2 { font-size: clamp(26px, 4.5vw, 34px); line-height: 1.18; margin: 0 0 16px; font-weight: 700; }
+  h3 { font-size: 16px; margin: 0 0 6px; font-weight: 650; }
+  p { max-width: 62ch; margin: 0 0 16px; }
+  .lead { font-size: 19px; color: var(--text); }
+  .muted { color: var(--muted); }
+  strong { font-weight: 650; color: var(--text); }
+  em { color: var(--text); }
+  code, .file {
+    font-family: var(--mono);
+    font-size: .88em;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 1px 7px;
+    white-space: nowrap;
+  }
+  a { color: var(--teal); text-decoration: none; }
+  a:hover, a:focus-visible { text-decoration: underline; }
+  a:focus-visible { outline: 2px solid var(--teal); outline-offset: 2px; border-radius: 3px; }
+
+  /* status pills */
+  .pills { display: flex; flex-wrap: wrap; gap: 10px; margin: 26px 0 0; }
+  .pill {
+    display: inline-flex; align-items: center; gap: 8px;
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: 999px; padding: 7px 15px;
+    font-size: 13px; color: var(--text);
+  }
+  .dot { width: 8px; height: 8px; border-radius: 50%; flex: none; }
+  .dot.green { background: var(--done); }
+  .dot.teal  { background: var(--teal); }
+  .dot.orange{ background: var(--anthropic); }
+
+  /* ── pipeline diagram: five stations, wired like the product ── */
+  .pipeline { display: flex; flex-direction: column; gap: 0; margin: 34px 0 10px; }
+  .station {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--accent, var(--anthropic));
+    border-radius: var(--radius);
+    padding: 18px 22px;
+    box-shadow: 0 4px 24px rgba(0,0,0,.35);
+  }
+  .station .tag {
+    font-family: var(--mono); font-size: 10.5px; letter-spacing: .14em;
+    text-transform: uppercase; color: var(--accent, var(--anthropic));
+    margin: 0 0 4px;
+  }
+  .station h3 { font-size: 17px; }
+  .station p { font-size: 14.5px; color: var(--muted); margin: 6px 0 0; max-width: none; }
+  .station .file { font-size: 12px; }
+  .wire {
+    display: flex; align-items: center; gap: 12px;
+    padding: 6px 0 6px 34px;
+  }
+  .wire .line {
+    width: 2px; height: 30px; flex: none;
+    background: repeating-linear-gradient(to bottom, var(--anthropic) 0 5px, transparent 5px 10px);
+    opacity: .75;
+  }
+  .wire .label { font-family: var(--mono); font-size: 11.5px; color: var(--muted); }
+
+  /* card grid for feature slide */
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px; margin: 28px 0 0; }
+  .cell {
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 18px 20px;
+  }
+  .cell h3 { display: flex; align-items: center; gap: 9px; font-size: 15px; }
+  .cell p { font-size: 14px; color: var(--muted); margin: 8px 0 0; max-width: none; }
+
+  /* timeline for the "one moment" slide */
+  .timeline { list-style: none; margin: 30px 0 0; padding: 0; }
+  .timeline li {
+    position: relative;
+    padding: 0 0 26px 34px;
+    border-left: 2px solid var(--border);
+    margin-left: 8px;
+  }
+  .timeline li:last-child { border-left-color: transparent; padding-bottom: 0; }
+  .timeline li::before {
+    content: "";
+    position: absolute; left: -7px; top: 5px;
+    width: 12px; height: 12px; border-radius: 50%;
+    background: var(--teal); border: 2px solid var(--bg);
+  }
+  .timeline .when { font-family: var(--mono); font-size: 11px; letter-spacing: .1em; text-transform: uppercase; color: var(--teal); display: block; margin-bottom: 3px; }
+  .timeline p { font-size: 15px; margin: 0; }
+
+  /* plain tables */
+  .tablewrap { overflow-x: auto; margin: 26px 0 0; border: 1px solid var(--border); border-radius: var(--radius); }
+  table { border-collapse: collapse; width: 100%; font-size: 14px; }
+  th, td { text-align: left; padding: 11px 16px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  tr:last-child td { border-bottom: none; }
+  th { font-family: var(--mono); font-size: 10.5px; letter-spacing: .14em; text-transform: uppercase; color: var(--muted); font-weight: 500; background: var(--card-2); }
+  td { background: var(--card); color: var(--muted); }
+  td:first-child { white-space: nowrap; color: var(--text); }
+
+  .callout {
+    background: var(--card); border: 1px solid var(--border);
+    border-left: 3px solid var(--teal);
+    border-radius: var(--radius); padding: 16px 20px; margin: 26px 0 0;
+    font-size: 15px; color: var(--muted); max-width: none;
+  }
+  .callout strong { color: var(--text); }
+
+  .kbd-line { font-family: var(--mono); font-size: 13.5px; background: var(--card-2); border: 1px solid var(--border); border-radius: 10px; padding: 12px 16px; margin: 10px 0 0; overflow-x: auto; white-space: nowrap; color: var(--text); }
+  .kbd-line .c { color: var(--muted); }
+</style>
+
+<div class="deck">
+
+  <!-- ─────────────────────────── SLIDE 1 ─────────────────────────── -->
+  <section class="slide">
+    <p class="eyebrow">Slide 1 · Where we are</p>
+    <h1>FleetView: a live map of your AI workforce</h1>
+    <p class="lead">When you give Claude Code a big job, it doesn't work alone — it hires a small team of helper AIs and hands each one a piece of the work. Normally that team is invisible. FleetView is the wall-mounted screen that shows them: who's working, on what, with which files, and whether anyone is stuck.</p>
+    <p>It runs entirely on your Mac at <strong>localhost:4747</strong>. Nothing is sent anywhere; no accounts, no cloud, no installed packages — just three small pieces reading and writing one text file.</p>
+    <p class="muted">Version 2 was finished and verified today. Everything is committed and pushed to <a href="https://github.com/psymonbee/fleeview">github.com/psymonbee/fleeview</a>.</p>
+    <div class="pills">
+      <span class="pill"><span class="dot green"></span>All 7 acceptance checks passed</span>
+      <span class="pill"><span class="dot green"></span>33 automated tests green</span>
+      <span class="pill"><span class="dot teal"></span>5 commits pushed to main</span>
+      <span class="pill"><span class="dot orange"></span>Proven live — it watched itself being built</span>
+    </div>
+  </section>
+
+  <!-- ─────────────────────────── SLIDE 2 ─────────────────────────── -->
+  <section class="slide">
+    <p class="eyebrow">Slide 2 · The big picture</p>
+    <h2>Five stations, one relay race</h2>
+    <p>Everything FleetView does is one straight line: something happens → it gets written down → the write-up is read → the picture updates on screen. Here are the five stations, in order:</p>
+
+    <div class="pipeline">
+      <div class="station" style="--accent: var(--anthropic)">
+        <p class="tag">Station 1 · The tap on the shoulder</p>
+        <h3>Claude Code's built-in "hooks"</h3>
+        <p>Claude Code has a feature where it taps a script of your choosing on the shoulder every time something happens — a session starts, a helper agent is hired, a file is edited. One block in your personal settings file points all of those taps at FleetView's note-taker. That settings block is the <em>entire</em> installation.</p>
+      </div>
+      <div class="wire"><span class="line"></span><span class="label">every event, as it happens</span></div>
+
+      <div class="station" style="--accent: var(--anthropic)">
+        <p class="tag">Station 2 · The note-taker &amp; translator</p>
+        <h3>A tiny script: <span class="file">hooks/emit-event.mjs</span> + <span class="file">adapters/claude-code.mjs</span></h3>
+        <p>The note-taker listens to each tap and passes it to a translator, which rewrites Claude Code's internal chatter into FleetView's own simple, universal language — short standard sentences like "agent demo-b1 started" or "step 3 is done". It's built to be a silent observer: if anything confuses it, it writes nothing and steps aside, so it can never interfere with your real work. The translator layer is new in v2 — it means other AI tools (like OpenAI's Codex) can be plugged in later just by writing them their own translator.</p>
+      </div>
+      <div class="wire"><span class="line"></span><span class="label">one line per event, appended</span></div>
+
+      <div class="station" style="--accent: var(--teal)">
+        <p class="tag">Station 3 · The diary</p>
+        <h3>One plain text file: <span class="file">~/.lumenade/events.jsonl</span></h3>
+        <p>Every translated event becomes one line in this file — a running diary of everything your agents have done. It's the only thing connecting the two halves of the system, and you can open it in any text editor. Delete it and FleetView simply starts a fresh diary.</p>
+      </div>
+      <div class="wire"><span class="line"></span><span class="label">read continuously, like a ticker tape</span></div>
+
+      <div class="station" style="--accent: var(--teal)">
+        <p class="tag">Station 4 · The newsroom</p>
+        <h3>A small server: <span class="file">server/server.mjs</span></h3>
+        <p>The server watches the diary for new lines and keeps the "current picture" in its head: which sessions exist, which agents are running, what each one touched last, how the plan is progressing. Whenever the picture changes, it broadcasts the change to every open browser tab instantly — no refreshing. Start it with <span class="file">npm start</span>.</p>
+      </div>
+      <div class="wire"><span class="line"></span><span class="label">live broadcast to the browser</span></div>
+
+      <div class="station" style="--accent: var(--teal)">
+        <p class="tag">Station 5 · The screen</p>
+        <h3>The page you look at: <span class="file">public/index.html</span></h3>
+        <p>One self-contained web page at localhost:4747. It draws the Orchestrator hub on the left, one card per agent on the right, animated wires between them, and the plan checklist down the side. It never talks to the internet — everything it shows comes from the newsroom next door.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ─────────────────────────── SLIDE 3 ─────────────────────────── -->
+  <section class="slide">
+    <p class="eyebrow">Slide 3 · What you actually see</p>
+    <h2>Reading the screen</h2>
+    <p>Everything on the canvas answers one question at a glance: <em>is my fleet healthy?</em></p>
+    <div class="grid">
+      <div class="cell"><h3><span class="dot orange"></span>The hub</h3><p>The orchestrator — the "manager" Claude that hires everyone else. It glows softly while a conversation turn is in progress.</p></div>
+      <div class="cell"><h3><span class="dot orange"></span>Agent cards</h3><p>One card per helper: its name, which AI model it runs on (Claude or OpenAI, colour-coded), what it was hired to do, and a live one-line status with a ticking clock.</p></div>
+      <div class="cell"><h3><span class="dot teal"></span>Plan rail <em>(new)</em></h3><p>The checklist down the left side. When the orchestrator writes itself a task list, each step appears here — grey waiting, pulsing in progress, ✓ done. Cards get a little S1/S2 tag showing which step they're working.</p></div>
+      <div class="cell"><h3><span class="dot teal"></span>File chips <em>(new)</em></h3><p>Small tags on each card naming the files that agent has touched. If two running agents grab the <em>same</em> file, both chips pulse amber and a warning appears — your early smoke alarm for agents treading on each other.</p></div>
+      <div class="cell"><h3><span class="dot teal"></span>The drawer <em>(new)</em></h3><p>Click any card and a panel slides out with that agent's full activity log, line by line, updating live — failures shown in red.</p></div>
+      <div class="cell"><h3><span class="dot green"></span>Final words <em>(new)</em></h3><p>When an agent finishes, its card keeps its parting message — the summary it handed back — so you can see what it claims to have accomplished.</p></div>
+      <div class="cell"><h3><span class="dot" style="background:var(--amber)"></span>Stall &amp; error alerts <em>(new)</em></h3><p>An agent that's been silent for two minutes turns amber and reads "stalled". A failure makes its card flash red for a second. We discovered during testing that Claude Code stays completely silent when a tool call fails, so FleetView infers failures itself: any action that starts but never reports back is marked as failed.</p></div>
+      <div class="cell"><h3><span class="dot" style="background:var(--muted)"></span>Bell &amp; narrator <em>(new)</em></h3><p>A bell toggle sends a desktop notification when a turn finishes while you're in another tab. And an optional narrator (off by default) has a tiny, cheap Claude write plain-English one-liners about what each agent is doing.</p></div>
+    </div>
+  </section>
+
+  <!-- ─────────────────────────── SLIDE 4 ─────────────────────────── -->
+  <section class="slide">
+    <p class="eyebrow">Slide 4 · One moment, end to end</p>
+    <h2>Follow a single event through the wire</h2>
+    <p>Say the orchestrator hires a Builder agent to write some code. Here's that one moment travelling the whole line — the entire trip takes about a second:</p>
+    <ul class="timeline">
+      <li><span class="when">The event</span><p>Claude Code spins up the Builder and taps FleetView's note-taker on the shoulder: <em>"a new agent just started."</em></p></li>
+      <li><span class="when">Translation</span><p>The translator turns that into one standard line — agent id, type "builder", what it was hired to do — and appends it to the diary. (v2 got smarter here: Claude Code tells us the agent's exact id and model at hiring time, so the card is labelled precisely, never guessed.)</p></li>
+      <li><span class="when">The newsroom notices</span><p>The server, watching the diary, reads the new line, adds the Builder to its current picture, and matches its job description against the plan checklist — "Build SSE fleet server" looks like step 1, so it gets the S1 tag.</p></li>
+      <li><span class="when">Broadcast</span><p>The updated Builder record is pushed to your open browser tab over a live connection.</p></li>
+      <li><span class="when">On screen</span><p>A new card fades in, a dashed orange wire draws itself from the hub, the clock starts ticking, and the plan rail's step 1 begins to pulse. From here every file it touches and every command it runs streams onto the card as it happens.</p></li>
+    </ul>
+  </section>
+
+  <!-- ─────────────────────────── SLIDE 5 ─────────────────────────── -->
+  <section class="slide">
+    <p class="eyebrow">Slide 5 · The map of the repo</p>
+    <h2>What each file is for</h2>
+    <p>Nine things in the repo do all the work. In plain terms:</p>
+    <div class="tablewrap">
+      <table>
+        <tr><th>File</th><th>Plain-English job</th></tr>
+        <tr><td><span class="file">hooks/emit-event.mjs</span></td><td>The note-taker Claude Code taps on every event. Deliberately tiny and silent — it can never break your real work.</td></tr>
+        <tr><td><span class="file">adapters/claude-code.mjs</span></td><td>The translator: Claude Code's dialect in, FleetView's universal language out. One of these per AI tool, eventually.</td></tr>
+        <tr><td><span class="file">~/.lumenade/events.jsonl</span></td><td>The diary (lives in your home folder, not the repo). One line per event. The whole system's single source of truth.</td></tr>
+        <tr><td><span class="file">server/server.mjs</span></td><td>The newsroom: reads the diary, keeps the current picture, broadcasts changes, and serves the web page.</td></tr>
+        <tr><td><span class="file">server/narrator.mjs</span></td><td>The optional commentator. Off unless you flip it on in the config.</td></tr>
+        <tr><td><span class="file">public/index.html</span></td><td>The screen — one self-contained page, no internet access needed or used.</td></tr>
+        <tr><td><span class="file">fleet.config.json</span></td><td>The settings dial: agent names and models, the hub's title, how long "silent" means stalled, narrator on/off.</td></tr>
+        <tr><td><span class="file">scripts/demo.mjs</span></td><td>A rehearsal tape: replays a fake 60-second orchestration so you can see every feature without running real agents.</td></tr>
+        <tr><td><span class="file">docs/FLEETVIEW-SPEC.md</span></td><td>The written contract. Every feature was specified here <em>before</em> being built; the builders and the checker all worked from this document.</td></tr>
+        <tr><td><span class="file">test/</span></td><td>33 automated checks, run against <em>real</em> recorded Claude Code events we captured during a probe session — not made-up samples.</td></tr>
+      </table>
+    </div>
+    <div class="callout"><strong>One clever safety rule worth knowing:</strong> the narrator uses a small Claude to describe your agents — but that Claude would itself trigger the hooks and appear on its own screen, forever. So every narrator run carries a "don't film the film crew" flag (<span class="file">FLEET_IGNORE</span>), and the note-taker steps aside when it sees it. Both sides were tested with the real Claude to prove the loop can't happen.</div>
+  </section>
+
+  <!-- ─────────────────────────── SLIDE 6 ─────────────────────────── -->
+  <section class="slide">
+    <p class="eyebrow">Slide 6 · Driving it</p>
+    <h2>How to use it, and how to remove it</h2>
+    <p><strong>To watch your fleet:</strong> start the server and open the page. Any Claude Code session on your Mac appears automatically the moment it does anything.</p>
+    <p class="kbd-line">cd ~/lumenADE &amp;&amp; npm start <span class="c">→ then open</span> http://localhost:4747</p>
+    <p style="margin-top:18px"><strong>To see a full show without real agents:</strong> run the rehearsal tape in a second terminal — plan steps, a failure, a stall, a file collision, the lot, in about a minute.</p>
+    <p class="kbd-line">npm run demo <span class="c">(add</span> -- --fast <span class="c">to skip the waits)</span></p>
+    <p style="margin-top:18px"><strong>To switch it all off:</strong> two moves, fully reversible — remove the hooks block from <span class="file">~/.claude/settings.json</span> (the taps stop), and delete the diary folder:</p>
+    <p class="kbd-line">rm -rf ~/.lumenade</p>
+    <p class="muted" style="margin-top:18px">The config dial lives in <span class="file">fleet.config.json</span> — rename an agent, change what counts as "stalled", or set <span class="file">narration.enabled</span> to true to hear the commentator.</p>
+  </section>
+
+  <!-- ─────────────────────────── SLIDE 7 ─────────────────────────── -->
+  <section class="slide">
+    <p class="eyebrow">Slide 7 · Proof &amp; what's next</p>
+    <h2>How we know it works — and where v3 goes</h2>
+    <p><strong>The proof is unusually good:</strong> FleetView v2 was built by exactly the kind of agent fleet it visualises — and the moment its capture pipeline went live, mid-build, it started recording its own construction. By the end, the screen showed the real Builder and Checker agents as live cards, and the plan rail was tracking the actual build checklist, step by step, to ✓ done. On top of that: 33 automated tests against real recorded events, a formal 7-point acceptance sweep by an independent checker agent, and a live end-to-end test with a real Claude session.</p>
+    <p><strong>Saved for v3</strong> (agreed scope, not forgotten): a one-command installer so others can use it, a translator for OpenAI's Codex CLI so its agents appear too, token/cost figures on each card (the diary already records what's needed), and a proper public-facing README for the GitHub page.</p>
+    <div class="pills">
+      <span class="pill"><span class="dot green"></span>v1 · built 16 July</span>
+      <span class="pill"><span class="dot green"></span>v2 · built &amp; shipped 17 July</span>
+      <span class="pill"><span class="dot teal"></span>v3 · scoped, waiting on you</span>
+    </div>
+  </section>
+
+</div>
