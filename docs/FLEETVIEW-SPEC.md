@@ -955,3 +955,277 @@ symptom if §19.2's no-bump rule breaks).
 10. Publication (USER steps): sweep §17.1 all-pass; README has no
     machine paths; repo public; `npx github:psymonbee/fleeview` works from
     a clean HOME.
+
+# FleetView v4 — amendment (2026-07-17)
+
+v4's driving shift: design for users who are not the original author. Two
+audiences: **bolt-on users** (existing Claude Code agents/flows — their
+agents already render, but degrade to `fallbackAgent` styling) get agent
+auto-discovery (§22); **blank-slate users** (no orchestration) get an
+opt-in starter fleet (§23). Plus: nested-spawn lineage (§24), pre-plan
+session activity (§25), capability chips (§26), a recorded descope (§27),
+and carried-over fixes (§28). Constraints unchanged: zero npm
+dependencies, Node ≥ 20 ESM, hook is a pure observer, single-file UI, SSE
+full-record upserts by id, reducer trusts `evt.t`. The schema stays `v: 1`
+— every addition here is additive, and §8's skip rule means old reducers
+ignore new kinds/fields silently. `hooks/emit-event.mjs` is untouched in
+v4 (the §2 keep-rule is v1-historical; since v2 all policy lives in the
+adapters).
+
+## 22. Agent auto-discovery (amends §10)
+
+New module `server/discovery.mjs`, zero-dep, never throws:
+
+- `parseFrontmatter(text)` — hand-rolled: file must begin `---\n`; scan to
+  the closing `\n---` fence; inside, only single-line `key: value` scalars
+  are read (`name`, `description`, `model` — unknown keys ignored, values
+  may be single- or double-quoted, CRLF tolerated). No fence, unterminated
+  fence, or empty file → `null`. Multiline values are ignored (the line
+  simply doesn't match `key: value`).
+- `scanAgentDir(dir)` — reads `*.md` files (non-recursive), returns
+  `{ [name]: {label, description?, model?} }` where `name` = frontmatter
+  `name` if present, else the filename stem. Label = name. Missing dir or
+  unreadable file → skipped silently.
+- Discovery targets: `~/.claude/agents` (scanned at server boot) and
+  `<session.cwd>/.claude/agents` (scanned on each `session.start` — that
+  event is rare, so re-scan-on-session-start is the entire cadence story;
+  no watchers). Project-level entries shadow user-level ones per name.
+  Discovered maps are held in module state on the server, keyed
+  user-level vs per-session.
+
+**`resolveAgentMeta` precedence becomes** (replacing §10's 3-step):
+
+1. event `model` if set — after **alias resolution** (below), prettified
+   via `modelNames` (unchanged longest-prefix rule);
+2. else user-file `config.agents[agentType]` (an agents map present in the
+   on-disk `fleet.config.json` — explicit config always beats discovery);
+3. else discovered entry (project-level, then user-level), with `model`
+   alias-resolved and prettified, `provider` inferred (below);
+4. else built-in default `agents` entry;
+5. else `{label: agentType, ...config.fallbackAgent}` — with the codex
+   exception: **if the event's `sessionId` starts `codex:`, the fallback
+   provider is `"openai"`** (kills the v3 nit where codex agents rendered
+   with the anthropic accent).
+
+New config key `modelAliases` (top-level, so the shallow merge composes
+cleanly with preserved v3 configs), built-in default:
+
+```json
+{ "modelAliases": { "sonnet": "claude-sonnet-5", "opus": "claude-opus-4-8",
+                    "haiku": "claude-haiku-4-5", "fable": "claude-fable-5" } }
+```
+
+Alias resolution maps a bare alias (as agent frontmatter uses: `model:
+sonnet`) to its canonical id before `modelNames` prettification; `inherit`
+and unknown aliases pass through untouched. Provider inference for
+discovered agents: `"anthropic"` unless the alias-resolved model id
+starts `gpt`/`o[0-9]`/`codex` → `"openai"`.
+
+The shipped `fleet.config.json` trims its `agents` block to the two codex
+entries (`codex-runner`, `codex-direct`) so discovery serves
+builder/checker on the dev machine too; the built-in defaults keep all
+four (step 4) so the demo and preserved v3 configs render identically.
+
+## 23. Starter agents — installer flag (amends §17.2, §17.3)
+
+New repo dir `starter-agents/` with `builder.md`, `checker.md`,
+`codex-runner.md` — genericized rewrites of the dev machine's agent
+definitions (no personal wording; codex-runner's description states it
+requires the Codex CLI, which is harmless if absent: the agent simply
+never gets spawned). Frontmatter: `name`, `description`, `model` (alias
+form, exercising §22). Added to the installer's `VENDOR_WHITELIST`.
+
+`bin/install.mjs --with-agents`: after the hooks merge, copy each starter
+file into `~/.claude/agents/` — **per-file `existsSync` guard, never
+overwrite**, print one line per file: `written` or `skipped (exists)`.
+All three are always offered (owner's decision — no PATH detection).
+`--uninstall` never touches `~/.claude/agents`; it prints the three
+paths so the user can remove them by hand if wanted. Usage text gains the
+flag; §17.3's "no other machine state" sentence is amended to name
+`~/.claude/agents/*` as user-owned once written.
+
+## 24. Nested-spawn lineage (amends §8, §9, §11, §13)
+
+**S3 probe (run 2026-07-17, live captures in
+`test/fixtures/nested-*.json`):** a subagent CAN spawn a subagent, and
+every hook fires:
+
+- Child `SubagentStart` fires normally (`agent_id`, `agent_type` only — no
+  parent field on any payload).
+- The parent link lives on the **parent's own Agent tool events**: its
+  `PreToolUse` (top-level `agent_id` = parent, `tool_input.description`/
+  `subagent_type`) fires immediately **before** the child's
+  `SubagentStart`; its `PostToolUse` carries top-level `agent_id` = parent
+  **and** `tool_response.agentId` = child (plus `resolvedModel`,
+  `status: "completed"`, full usage) — but for the observed synchronous
+  nested spawn it fires **after the child's `SubagentStop`**. So the
+  Pre-side path is what links the tree while the child runs; the
+  Post-side path is the authoritative repair.
+- Child `SubagentStop` fires normally (`agent_transcript_path`,
+  `last_assistant_message` — §19 enrichment works unchanged for nested
+  agents).
+
+**§8:** `agent.spawn-pending` gains optional `parentAgentId`;
+`agent.start` gains optional `parentAgentId`. Additive; `v` stays 1.
+
+**§9:** the `Agent`/`Task` **with** `agent_id` branches change from
+activity-only to activity-plus-lineage:
+
+- `PreToolUse` `Agent`/`Task` **with** `agent_id` → the existing
+  `agent.activity {phase:"start"}` **plus**
+  `agent.spawn-pending {agentType, description,
+  parentAgentId: agent_id}` (fuzzy — no child id exists yet).
+- `PostToolUse` `Agent`/`Task` **with** `agent_id` and with
+  `tool_response.agentId` → the existing `agent.activity {phase:"end"}`
+  **plus** `agent.spawn-pending {agentId: tool_response.agentId,
+  parentAgentId: agent_id, agentType, description,
+  model: tool_response.resolvedModel}` (exact). Without
+  `tool_response.agentId` → activity only (unchanged).
+
+**§11:** `AgentRun` gains `parentId` (default `null`; included in
+snapshots/upserts — old clients ignore it). Fuzzy `pendingSpawns` entries
+and `exactPending` records carry `parentAgentId` through both claim paths
+(§11's claim order is unchanged); an exact claim **overwrites** a
+fuzzy-set `parentId` (authoritative repair — covers a fuzzy mis-claim
+when same-type spawns race). If an exact spawn-pending arrives for an
+agent that already ended, update the record anyway (post-mortem link).
+Self-reference guard: `parentId === agentId` → treated as null.
+
+**§13:** ordering: children render immediately after their parent
+(depth-first within the `startedAt` sort); indent 24 px per depth level,
+**capped at depth 2** (deeper nesting renders at depth-2 indent). Edge:
+`renderPath` sources the bézier at the **parent card's** left-center
+(same x as the child's column, offset up) instead of the hub when
+`parentId` resolves to a rendered card; missing/unresolved parent → hub
+source (flat fallback, exactly v3 behavior). `CARD_H`/`RHYTHM`
+unchanged. Drawer header shows `spawned by <parent label>` when set.
+
+Codex lineage: deferred — the embedded schemas expose no parent field
+(`turn_id` is not lineage). Recorded, not attempted.
+
+## 25. Session activity — pre-plan orchestrator (amends §8, §11, §12, §13)
+
+Problem (v4 parking lot): the UI looks dead between `session.start` and
+the first spawn while the orchestrator reads/plans.
+
+**§8:** new kind `session.activity {tool, hint?` (≤120)`, file?}` —
+main-loop tool call, no agent involved. Additive.
+
+**§9 (both adapters):** main-loop `PreToolUse` (no `agent_id`) whose
+`tool_name` is **not** one of {`Agent`, `Task`, `TaskCreate`,
+`TaskUpdate`, `ExitPlanMode`, `mcp__codex__*`} → `session.activity
+{tool: tool_name, hint, file}` (same hint/file derivation as
+`agent.activity`). **Pre only** — main-loop `PostToolUse` of plain tools
+stays `[]` (halves the volume; no duration display at session level).
+The codex adapter additionally maps its plugin-gated `PermissionRequest`
+→ `session.activity {tool: "permission", hint: tool_name}` and
+`PreCompact`/`PostCompact` → `session.activity {tool: "compact",
+hint: "pre"|"post"}` (closes §18.3's unmapped rows; §28c).
+
+**§11:** `Session` gains `currentActivity` (`{tool, hint?, file?, t}` |
+null). Set on `session.activity`; cleared on `agent.spawn-pending`
+(the orchestrator is delegating — the fleet takes over the story) and on
+`turn.end`. Per-session log ring `sessionLogs` (cap 50, same shape as
+`agentLogs` entries) feeds a new endpoint `GET /sessions/:id/log`.
+`session.activity` bumps session freshness only — it must never touch
+any agent's `lastActivityAt` (§19.2's no-bump rule is about usage; this
+is the session-side analogue: agent stall detection stays agent-local).
+
+**§12:** `session` records in SSE (snapshot + upserts) carry
+`currentActivity`. The ring is endpoint-only (not in snapshots), like
+agent logs.
+
+**§13:** the hub shows `currentActivity` as a one-line activity readout
+under the subtitle (`tool: hint` truncated to fit) while the session is
+`turnActive` and `currentActivity` is non-null; hidden otherwise. The
+empty-state text changes from implying "nothing happening" to reflecting
+that the orchestrator is working when `currentActivity` is set.
+
+Events-file growth: one extra line per main-loop tool call (Pre only) —
+unbounded file already documented; README gains a note, rotation stays
+out of scope for v4.
+
+## 26. Capability chips — skills & MCP (amends §9, §11, §13)
+
+Derived, no new kind. **§9:** the `agent.activity` hint chain gains a
+`Skill` case: `tool === "Skill"` → `hint = truncate(tool_input.skill ??
+"", 120)` (the skill name, not the args). Applies to `session.activity`
+hint derivation too.
+
+**§11:** on every `agent.activity` (and `session.activity`), derive
+capability tags from `tool`: `mcp__<server>__<tool>` → `{kind: "mcp",
+name: <server>}` (first `__`-delimited segment after the prefix);
+`tool === "Skill"` with a hint → `{kind: "skill", name: hint}`.
+`AgentRun.capabilities` and `Session.capabilities`: insertion-ordered
+deduped array (dedupe key `kind:name`), **cap 8** (first 8 win), carried
+on record upserts.
+
+**§13:** capability chips render **in the existing files-row** on agent
+cards (capabilities first, then files; the row's existing ≤3-visible +
+`+N` overflow budget is shared) so `CARD_H`/`RHYTHM` are untouched. Chip
+shows the name with a small glyph distinguishing skill vs MCP; the drawer
+shows the full capability list as its own row above files.
+
+## 27. Usage limits — parked (record only)
+
+The v4 parking lot asked for `/usage`-style limit visibility. Probed
+2026-07-17: **Claude Code writes no rate-limit/window/reset data anywhere
+on disk** — transcripts carry per-message `usage` token counts only;
+`~/.claude/stats-cache.json` holds daily message/session/toolCall counts;
+no statsig/limit/rate files exist. Codex **does** expose real limits
+(rollout files' `token_count` event: `rate_limits {used_percent,
+window_minutes, resets_at, plan_type}`, see
+`test/fixtures/codex/PROBE-NOTES.md`) but that source is behind the
+plugin gate. Decision (owner, 2026-07-17): parked for v5 rather than
+built on the wrong data. This section exists so v5 does not relearn the
+probe.
+
+## 28. Carried-over fixes
+
+- **(a) Narrow-viewport band:** with the rail visible, `248px + 820px`
+  stage min-width forces a horizontal scrollbar between 900–1068 px. Fix:
+  auto-collapse the rail below 1069 px (same collapsed state the user
+  toggle produces). Acceptance: `document.documentElement.scrollWidth ===
+  clientWidth` at 920, 1000, and 1280 px.
+- **(b) `agent.start` transcriptPath:** §8 declares it; the reducer drops
+  it today (only `session.start`/`agent.end` retain). One-liner in the
+  `agent.start` case; matters for any future source that supplies it at
+  start.
+- **(c)** Codex `PermissionRequest`/`Pre-PostCompact` mapping — specified
+  in §25, closes §18.3's unmapped rows.
+
+## 29. v4 acceptance criteria
+
+1. `node --check` every changed `.mjs`; `npm test` green (v2+v3 suites
+   plus new: discovery, reducer-v4, extended adapter/codex-adapter/
+   install suites). All tests: scratch `FLEET_EVENTS_FILE`, scratch
+   `HOME`, ports 48xx.
+2. Back-compat: no-arg hook path unchanged for v3-era payloads; live
+   settings.json needs no edit on upgrade; a v3 events log replays into a
+   v4 server without error (new fields absent → old behavior).
+3. Discovery: scratch HOME with a seeded `~/.claude/agents/<name>.md` →
+   that agentType renders discovered label/model (alias-resolved,
+   prettified)/provider; explicit user-file `config.agents` entry beats
+   discovery; `codex:`-namespaced unknown type gets the openai accent;
+   corrupt/fenceless frontmatter files are skipped without error.
+4. Starter agents: `--yes --with-agents` writes 3 files (printed);
+   pre-existing file preserved byte-identical (printed as skipped);
+   without the flag nothing is written; `--uninstall` leaves them;
+   vendored app contains `starter-agents/`.
+5. Lineage: piping `nested-*.json` fixtures through the no-arg hook
+   yields the §24 event pairs; reducer sets `parentId` under both
+   orderings (pre-fuzzy then start; start then exact-post); missing
+   parent renders flat; demo's nested card indents under its parent with
+   a parent-sourced edge.
+6. Session activity: main-loop `Read` Pre → one `session.activity`;
+   main-loop `Agent` Pre → spawn-pending only (no session.activity);
+   plain main-loop Post → `[]`; hub shows the activity line pre-plan and
+   clears it on delegation/turn-end; **demo-s1 still renders stalled**.
+7. Capabilities: `mcp__codex__foo` activity → chip `mcp:codex` (deduped);
+   `Skill` activity → chip `skill:<name>`; cap 8 holds; card geometry
+   unchanged (CARD_H/RHYTHM byte-identical).
+8. Viewport: acceptance widths per §28a; zero console errors; zero
+   external URLs.
+9. Live: a real session shows pre-plan hub activity before the first
+   spawn, discovered styling on a custom agent, and a nested spawn
+   drawing a parent-sourced edge while the child runs (Pre-side link).

@@ -1,0 +1,77 @@
+{
+  "session_id": "2ae08aee-7038-49f8-80d0-9c4d4ad4d346",
+  "transcript_path": "/Users/simon/.claude/projects/-Users-simon-nested-probe/2ae08aee-7038-49f8-80d0-9c4d4ad4d346.jsonl",
+  "cwd": "/Users/simon/nested-probe",
+  "prompt_id": "d7aad573-acf0-4bf8-880d-c2265e7ad848",
+  "permission_mode": "auto",
+  "agent_id": "ac87ff2ff3d145aad",
+  "agent_type": "general-purpose",
+  "effort": {
+    "level": "high"
+  },
+  "hook_event_name": "PostToolUse",
+  "tool_name": "Agent",
+  "tool_input": {
+    "description": "Read note.txt",
+    "prompt": "Read the file note.txt in the current working directory and reply with its exact contents.",
+    "subagent_type": "general-purpose",
+    "run_in_background": false
+  },
+  "tool_response": {
+    "status": "completed",
+    "prompt": "Read the file note.txt in the current working directory and reply with its exact contents.",
+    "agentId": "a035ab21c1995b9cd",
+    "agentType": "general-purpose",
+    "content": [
+      {
+        "type": "text",
+        "text": "The exact contents of note.txt:\n\n```\nnested-ok\n```"
+      }
+    ],
+    "resolvedModel": "claude-opus-4-8[1m]",
+    "totalDurationMs": 7305,
+    "totalTokens": 19741,
+    "totalToolUseCount": 1,
+    "usage": {
+      "input_tokens": 2,
+      "cache_creation_input_tokens": 1546,
+      "cache_read_input_tokens": 18170,
+      "output_tokens": 23,
+      "server_tool_use": {
+        "web_search_requests": 0,
+        "web_fetch_requests": 0
+      },
+      "service_tier": "standard",
+      "cache_creation": {
+        "ephemeral_1h_input_tokens": 0,
+        "ephemeral_5m_input_tokens": 1546
+      },
+      "inference_geo": "not_available",
+      "iterations": [
+        {
+          "input_tokens": 2,
+          "output_tokens": 23,
+          "cache_read_input_tokens": 18170,
+          "cache_creation_input_tokens": 1546,
+          "cache_creation": {
+            "ephemeral_5m_input_tokens": 1546,
+            "ephemeral_1h_input_tokens": 0
+          },
+          "type": "message"
+        }
+      ],
+      "speed": "standard"
+    },
+    "toolStats": {
+      "readCount": 1,
+      "searchCount": 0,
+      "bashCount": 0,
+      "editFileCount": 0,
+      "linesAdded": 0,
+      "linesRemoved": 0,
+      "otherToolCount": 0
+    }
+  },
+  "tool_use_id": "toolu_011e3CYvK9MoZyXPfrFoU4hE",
+  "duration_ms": 7306
+}

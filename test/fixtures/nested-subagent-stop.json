@@ -1,0 +1,18 @@
+{
+  "session_id": "2ae08aee-7038-49f8-80d0-9c4d4ad4d346",
+  "transcript_path": "/Users/simon/.claude/projects/-Users-simon-nested-probe/2ae08aee-7038-49f8-80d0-9c4d4ad4d346.jsonl",
+  "cwd": "/Users/simon/nested-probe",
+  "prompt_id": "d7aad573-acf0-4bf8-880d-c2265e7ad848",
+  "permission_mode": "auto",
+  "agent_id": "a035ab21c1995b9cd",
+  "agent_type": "general-purpose",
+  "effort": {
+    "level": "high"
+  },
+  "hook_event_name": "SubagentStop",
+  "stop_hook_active": false,
+  "agent_transcript_path": "/Users/simon/.claude/projects/-Users-simon-nested-probe/2ae08aee-7038-49f8-80d0-9c4d4ad4d346/subagents/agent-a035ab21c1995b9cd.jsonl",
+  "last_assistant_message": "The exact contents of note.txt:\n\n```\nnested-ok\n```",
+  "background_tasks": [],
+  "session_crons": []
+}
