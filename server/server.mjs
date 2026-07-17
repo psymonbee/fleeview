@@ -1,9 +1,10 @@
 #!/usr/bin/env node
 // FleetView server: static file server for public/ + SSE fleet state at
-// GET /events + GET /healthz + GET /agents/:id/log. Tails the neutral events
-// JSONL file (docs/FLEETVIEW-SPEC.md §8), reduces it into Session/AgentRun/
-// Plan state (§11), and pushes updates to connected clients (§12). Zero npm
-// dependencies — node:http / node:fs only.
+// GET /events + GET /healthz + GET /agents/:id/log + GET /sessions/:id/log
+// (§25). Tails the neutral events JSONL file (docs/FLEETVIEW-SPEC.md §8),
+// reduces it into Session/AgentRun/Plan state (§11, §24, §25, §26), and
+// pushes updates to connected clients (§12). Zero npm dependencies —
+// node:http / node:fs only.
 
 import http from "node:http";
 import {
@@ -232,9 +233,11 @@ let codexCounters = new Map();
 let plans = new Map();
 /** @type {Map<string, Array<object>>} agentId -> LogEntry ring (cap 50) */
 let agentLogs = new Map();
+/** @type {Map<string, Array<object>>} sessionId -> LogEntry ring (cap 50, §25) */
+let sessionLogs = new Map();
 /** @type {Map<string, Map<string, object>>} agentId -> callId -> open call */
 let openCalls = new Map();
-/** @type {Map<string, object>} agentId -> {description, model, agentType, t, sessionId} */
+/** @type {Map<string, object>} agentId -> {description, model, agentType, parentAgentId?, t, sessionId} */
 let exactPending = new Map();
 
 /** SSE subscriber response objects */
@@ -247,6 +250,7 @@ function resetState() {
   codexCounters = new Map();
   plans = new Map();
   agentLogs = new Map();
+  sessionLogs = new Map();
   openCalls = new Map();
   exactPending = new Map();
   discoveredProjectAgents = new Map();
@@ -274,6 +278,8 @@ function getOrCreateSession(sessionId, t, cwd) {
       transcriptPath: null,
       tokens: null,
       costUsd: null,
+      currentActivity: null, // §25
+      capabilities: [], // §26
     };
     sessions.set(sessionId, session);
     broadcast({ type: "session", session });
@@ -298,9 +304,11 @@ function pushPendingSpawn(sessionId, spawn) {
   }
 }
 
+// Returns the claimed spawn record (§24: carries parentAgentId when the
+// fuzzy PreToolUse event had one) or null when nothing matched/remained.
 function claimPendingSpawn(sessionId, agentType, nowMs) {
   const list = pendingSpawns.get(sessionId);
-  if (!list || list.length === 0) return "";
+  if (!list || list.length === 0) return null;
 
   // Expire stale entries first.
   for (let i = list.length - 1; i >= 0; i--) {
@@ -309,12 +317,12 @@ function claimPendingSpawn(sessionId, agentType, nowMs) {
       list.splice(i, 1);
     }
   }
-  if (list.length === 0) return "";
+  if (list.length === 0) return null;
 
   let idx = list.findIndex((s) => s.agentType === agentType);
   if (idx === -1) idx = 0;
   const [claimed] = list.splice(idx, 1);
-  return claimed ? claimed.description : "";
+  return claimed || null;
 }
 
 // Exact-claim spawn-pending removes its PreToolUse (legacy fuzzy) twin so the
@@ -342,6 +350,19 @@ function pushLogEntry(agentId, entry) {
   }
 }
 
+// §25: per-session log ring, same cap/shape convention as pushLogEntry.
+function pushSessionLogEntry(sessionId, entry) {
+  let list = sessionLogs.get(sessionId);
+  if (!list) {
+    list = [];
+    sessionLogs.set(sessionId, list);
+  }
+  list.push(entry);
+  if (list.length > LOG_RING_CAP) {
+    list.splice(0, list.length - LOG_RING_CAP);
+  }
+}
+
 function addFile(files, file) {
   const next = (files || []).filter((f) => f !== file);
   next.unshift(file);
@@ -352,6 +373,42 @@ function addFile(files, file) {
 function upsertAgent(agent) {
   agents.set(agent.id, agent);
   broadcast({ type: "agent", agent });
+}
+
+// §24 self-reference guard: an agent can never be its own parent.
+function sanitizeParentId(parentId, selfId) {
+  if (parentId == null) return null;
+  return parentId === selfId ? null : parentId;
+}
+
+// §26: derive a capability tag from a tool name -- mcp__<server>__<tool> ->
+// {kind: "mcp", name: <server>} (first "__"-delimited segment after the
+// "mcp__" prefix); tool === "Skill" with a non-empty hint -> {kind: "skill",
+// name: hint}. Anything else -> null (no capability signal).
+function deriveCapability(tool, hint) {
+  if (typeof tool !== "string") return null;
+  if (tool.startsWith("mcp__")) {
+    const rest = tool.slice("mcp__".length);
+    const idx = rest.indexOf("__");
+    const server = idx === -1 ? rest : rest.slice(0, idx);
+    return server ? { kind: "mcp", name: server } : null;
+  }
+  if (tool === "Skill" && typeof hint === "string" && hint.length > 0) {
+    return { kind: "skill", name: hint };
+  }
+  return null;
+}
+
+// §26: insertion-ordered, deduped (kind:name) append onto record.capabilities,
+// cap 8 (first 8 win). No-op when tag is null or already present or the cap
+// is already full.
+function addCapabilityTag(record, tag) {
+  if (!tag) return;
+  if (!Array.isArray(record.capabilities)) record.capabilities = [];
+  const key = `${tag.kind}:${tag.name}`;
+  if (record.capabilities.some((c) => `${c.kind}:${c.name}` === key)) return;
+  if (record.capabilities.length >= 8) return;
+  record.capabilities.push(tag);
 }
 
 // Null agentId only ever occurs for codex-direct (S1 finding, §9): pair it
@@ -508,11 +565,39 @@ function applyEvent(evt) {
 
     case "turn.end": {
       session.turnActive = false;
+      session.currentActivity = null; // §25: delegation/turn-end clears the readout
+      broadcast({ type: "session", session });
+      break;
+    }
+
+    // §25: pre-plan orchestrator activity -- a main-loop tool call with no
+    // agent involved. Bumps session freshness (handled above, generically)
+    // but must NEVER touch any agent's lastActivityAt -- agent stall
+    // detection stays agent-local.
+    case "session.activity": {
+      const activity = { tool: evt.tool, t };
+      if (evt.hint !== undefined) activity.hint = evt.hint;
+      if (evt.file !== undefined) activity.file = evt.file;
+      session.currentActivity = activity;
+
+      const entry = { t, tool: evt.tool };
+      if (evt.hint !== undefined) entry.hint = evt.hint;
+      if (evt.file !== undefined) entry.file = evt.file;
+      pushSessionLogEntry(sessionId, entry);
+
+      // §26: derive a capability tag from this activity's tool.
+      addCapabilityTag(session, deriveCapability(evt.tool, evt.hint));
+
       broadcast({ type: "session", session });
       break;
     }
 
     case "agent.spawn-pending": {
+      // §25: any spawn-pending (exact or fuzzy) means the orchestrator is
+      // delegating -- the fleet takes over the story, clear the pre-plan
+      // activity readout.
+      session.currentActivity = null;
+
       const agentId = evt.agentId;
       if (agentId) {
         // Exact claim.
@@ -521,6 +606,12 @@ function applyEvent(evt) {
         if (existing) {
           if (evt.description !== undefined) existing.description = evt.description;
           if (evt.model !== undefined) existing.model = prettifyModel(evt.model);
+          // §24: an exact spawn-pending's parentAgentId is authoritative --
+          // it overwrites a fuzzy-set parentId, and still applies even if
+          // this agent already ended (post-mortem link).
+          if (evt.parentAgentId !== undefined) {
+            existing.parentId = sanitizeParentId(evt.parentAgentId, agentId);
+          }
           existing.stepId = matchPlanStep(sessionId, existing.description);
           broadcast({ type: "agent", agent: existing });
         } else {
@@ -528,6 +619,7 @@ function applyEvent(evt) {
             description,
             model: evt.model,
             agentType: evt.agentType,
+            parentAgentId: evt.parentAgentId,
             t,
             sessionId,
           });
@@ -538,9 +630,12 @@ function applyEvent(evt) {
         pushPendingSpawn(sessionId, {
           agentType: evt.agentType ?? "claude",
           description: evt.description ?? "",
+          parentAgentId: evt.parentAgentId,
           t,
         });
       }
+
+      broadcast({ type: "session", session });
       break;
     }
 
@@ -562,16 +657,31 @@ function applyEvent(evt) {
       if (exact) exactPending.delete(agentId);
 
       let description;
+      let claimedFuzzy = null;
       if (evt.description !== undefined) {
         description = evt.description;
       } else if (exact && exact.description !== undefined) {
         description = exact.description;
       } else {
-        description = claimPendingSpawn(sessionId, agentType, nowMs);
+        claimedFuzzy = claimPendingSpawn(sessionId, agentType, nowMs);
+        description = claimedFuzzy ? claimedFuzzy.description : "";
       }
 
       let rawModel = evt.model;
       if (rawModel === undefined && exact) rawModel = exact.model;
+
+      // §24 lineage: agent.start's own parentAgentId wins (declared but
+      // unused by today's adapters), else the exact spawn-pending's, else
+      // the fuzzy pending entry's (transferred at claim time). Self-
+      // reference is sanitized once below, against this agent's own id.
+      let parentAgentId;
+      if (evt.parentAgentId !== undefined) {
+        parentAgentId = evt.parentAgentId;
+      } else if (exact && exact.parentAgentId !== undefined) {
+        parentAgentId = exact.parentAgentId;
+      } else if (claimedFuzzy && claimedFuzzy.parentAgentId !== undefined) {
+        parentAgentId = claimedFuzzy.parentAgentId;
+      }
 
       const meta = resolveAgentMeta(agentType, rawModel, sessionId);
 
@@ -599,6 +709,8 @@ function applyEvent(evt) {
           transcriptPath: evt.transcriptPath ?? null, // §28b
           tokens: null,
           costUsd: null,
+          parentId: sanitizeParentId(parentAgentId, agentId), // §24
+          capabilities: [], // §26
         };
       } else {
         agent.agentType = agentType;
@@ -609,6 +721,7 @@ function applyEvent(evt) {
         agent.status = "running";
         agent.lastActivityAt = t;
         if (evt.transcriptPath !== undefined) agent.transcriptPath = evt.transcriptPath; // §28b
+        if (parentAgentId !== undefined) agent.parentId = sanitizeParentId(parentAgentId, agentId); // §24
       }
 
       agent.stepId = matchPlanStep(sessionId, agent.description);
@@ -631,6 +744,10 @@ function applyEvent(evt) {
       const phase = evt.phase;
       const tool = evt.tool;
       const callId = evt.callId;
+
+      // §26: derive a capability tag from this activity's tool, regardless
+      // of phase (tool is present on both start and end).
+      addCapabilityTag(agent, deriveCapability(tool, evt.hint));
 
       let calls = openCalls.get(agentId);
       if (!calls) {
@@ -832,6 +949,7 @@ function pruneOldRecords(nowMs) {
       pendingSpawns.delete(id);
       codexCounters.delete(id);
       plans.delete(id);
+      sessionLogs.delete(id); // §25
     }
   }
 }
@@ -1138,6 +1256,7 @@ function serveStatic(req, res, urlPath) {
 // ---------------------------------------------------------------------------
 
 const AGENT_LOG_RE = /^\/agents\/([^/]+)\/log$/;
+const SESSION_LOG_RE = /^\/sessions\/([^/]+)\/log$/;
 
 const server = http.createServer((req, res) => {
   const urlPath = req.url || "/";
@@ -1178,6 +1297,15 @@ const server = http.createServer((req, res) => {
     const entries = agentLogs.get(agentId) || [];
     res.writeHead(200, { "Content-Type": "application/json" });
     res.end(JSON.stringify({ agentId, entries }));
+    return;
+  }
+
+  const sessionLogMatch = pathname.match(SESSION_LOG_RE);
+  if (sessionLogMatch) {
+    const sessionId = decodeURIComponent(sessionLogMatch[1]);
+    const entries = sessionLogs.get(sessionId) || [];
+    res.writeHead(200, { "Content-Type": "application/json" });
+    res.end(JSON.stringify({ sessionId, entries }));
     return;
   }
 
