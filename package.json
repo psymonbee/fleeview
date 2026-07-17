@@ -1,10 +1,14 @@
 {
-  "name": "lumenade",
+  "name": "fleetview",
   "private": true,
   "type": "module",
+  "bin": {
+    "fleetview": "bin/install.mjs"
+  },
   "scripts": {
     "start": "node server/server.mjs",
-    "demo": "node scripts/demo.mjs"
+    "demo": "node scripts/demo.mjs",
+    "test": "node --test"
   },
   "engines": {
     "node": ">=20"
