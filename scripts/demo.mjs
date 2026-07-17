@@ -64,6 +64,8 @@ function describe(evt) {
       return `plan.step ${evt.stepId}${evt.status ? " -> " + evt.status : ""}`;
     case "plan.doc":
       return "plan.doc";
+    case "session.activity":
+      return `session.activity ${evt.tool}${evt.hint ? " " + evt.hint : ""}`;
     default:
       return evt.kind;
   }
@@ -75,6 +77,17 @@ async function main() {
   await sleep(700);
   emit("turn.start");
   await sleep(1000);
+
+  // ---- 1a. pre-plan session activity (§25) — hub shows real work instead
+  // of dead air while the orchestrator reads before committing to a plan;
+  // the first agent.spawn-pending beat below clears it (reducer behavior —
+  // we just emit the reads).
+  emit("session.activity", { tool: "Read", hint: "README.md", file: "README.md" });
+  await sleep(450);
+  emit("session.activity", { tool: "Grep", hint: "grep -rn FLEETVIEW-SPEC docs/" });
+  await sleep(500);
+  emit("session.activity", { tool: "Bash", hint: "git log --oneline -5" });
+  await sleep(600);
 
   emit("plan.doc", {
     markdown:
@@ -171,6 +184,72 @@ async function main() {
   });
   await sleep(400);
 
+  // ---- 2b. demo-b1 spawns a nested sub-agent (§24) -----------------------
+  // Pre-side link: fuzzy spawn-pending carries parentAgentId while the
+  // child runs (no child id exists yet — mirrors the parent's PreToolUse
+  // firing immediately before the child's SubagentStart). The exact link
+  // (Post-side) only arrives after the child's SubagentStop in the live S3
+  // probe, so it's emitted below after demo-n1's agent.end, not before.
+  emit("agent.spawn-pending", {
+    agentType: "Explore",
+    description: "Find reusable event-schema helpers for the SSE endpoint",
+    parentAgentId: "demo-b1",
+  });
+  await sleep(500);
+  emit("agent.start", { agentId: "demo-n1", agentType: "Explore" });
+  await sleep(900);
+
+  // activity 1 — local search
+  cid = nextCallId("demo-n1");
+  emit("agent.activity", {
+    agentId: "demo-n1",
+    phase: "start",
+    callId: cid,
+    tool: "Grep",
+    hint: "grep -rn schema server/",
+  });
+  await sleep(1100);
+  emit("agent.activity", { agentId: "demo-n1", phase: "end", callId: cid, tool: "Grep", ms: 1100 });
+  await sleep(400);
+
+  // activity 2 — capability chip (§26): MCP tool call renders "mcp:github"
+  cid = nextCallId("demo-n1");
+  emit("agent.activity", {
+    agentId: "demo-n1",
+    phase: "start",
+    callId: cid,
+    tool: "mcp__github__search_code",
+    hint: 'search_code "agent.spawn-pending schema"',
+  });
+  await sleep(1300);
+  emit("agent.activity", {
+    agentId: "demo-n1",
+    phase: "end",
+    callId: cid,
+    tool: "mcp__github__search_code",
+    ms: 1300,
+  });
+  await sleep(500);
+
+  emit("agent.end", {
+    agentId: "demo-n1",
+    agentType: "Explore",
+    finalMessage: "No reusable schema helper found upstream — building fresh in server/server.mjs is right.",
+  });
+  await sleep(400);
+
+  // exact post-link (§9 PostToolUse path) — arrives after the child ended,
+  // same ordering the live S3 probe captured for synchronous nested spawns;
+  // an exact claim overwrites the fuzzy-set parentId (authoritative repair).
+  emit("agent.spawn-pending", {
+    agentId: "demo-n1",
+    parentAgentId: "demo-b1",
+    agentType: "Explore",
+    description: "Find reusable event-schema helpers for the SSE endpoint",
+    model: "claude-haiku-4-5",
+  });
+  await sleep(600);
+
   // ---- 3. codex lane spawns via the fuzzy-claim path (in parallel) ------
   emit("agent.spawn-pending", { agentType: "codex-runner", description: "Build fleet canvas UI" });
   await sleep(500);
@@ -231,6 +310,19 @@ async function main() {
     costUsd: 1.184,
   });
   await sleep(400);
+
+  // capability chip (§26) — Skill call renders a "skill:code-review" chip
+  cid = nextCallId("demo-b1");
+  emit("agent.activity", {
+    agentId: "demo-b1",
+    phase: "start",
+    callId: cid,
+    tool: "Skill",
+    hint: "code-review",
+  });
+  await sleep(1300);
+  emit("agent.activity", { agentId: "demo-b1", phase: "end", callId: cid, tool: "Skill", ms: 1300 });
+  await sleep(500);
 
   // second codex activity
   cid = nextCallId("demo-c1");
