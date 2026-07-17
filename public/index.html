@@ -1,0 +1,1834 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>LumenADE Fleet View</title>
+  <style>
+    :root {
+      --bg: #0A0C10;
+      --card: #151A23;
+      --border: #232B38;
+      --text: #E6EAF2;
+      --muted: #8B94A7;
+      --anthropic: #D97757;
+      --openai: #19C29D;
+      --done: #7BC47F;
+      --error: #E5484D;
+      --amber: #E8A23D;
+      --radius: 16px;
+      --shadow: 0 4px 24px rgba(0,0,0,.35);
+      --font: -apple-system, "SF Pro Text", Segoe UI, system-ui, sans-serif;
+      --mono: ui-monospace, "SF Mono", Menlo, monospace;
+      color-scheme: dark;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-width: 320px;
+      height: 100vh;
+      overflow: hidden;
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--font);
+      letter-spacing: 0;
+    }
+
+    button,
+    select {
+      font: inherit;
+    }
+
+    .app {
+      display: grid;
+      grid-template-rows: 48px 1fr;
+      height: 100vh;
+      background:
+        radial-gradient(circle, rgba(255,255,255,.05) 1px, transparent 1.25px) 0 0 / 24px 24px,
+        var(--bg);
+    }
+
+    .topbar {
+      z-index: 5;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      height: 48px;
+      padding: 0 18px;
+      border-bottom: 1px solid rgba(35,43,56,.85);
+      background: rgba(10,12,16,.84);
+      backdrop-filter: blur(16px);
+    }
+
+    .brand,
+    .controls,
+    .chip,
+    .live,
+    .hub-title,
+    .agent-head,
+    .status-line,
+    .done-pill {
+      display: flex;
+      align-items: center;
+    }
+
+    .brand {
+      min-width: 0;
+      gap: 10px;
+      font-size: 13px;
+      font-weight: 650;
+      white-space: nowrap;
+    }
+
+    .logo {
+      display: grid;
+      place-items: center;
+      width: 22px;
+      height: 22px;
+      border: 1px solid rgba(230,234,242,.16);
+      border-radius: 7px;
+      background: linear-gradient(145deg, rgba(217,119,87,.25), rgba(25,194,157,.18));
+      box-shadow: 0 0 24px rgba(25,194,157,.08);
+    }
+
+    .logo svg {
+      width: 13px;
+      height: 13px;
+      fill: none;
+      stroke: var(--text);
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      stroke-width: 1.8;
+    }
+
+    .controls {
+      gap: 10px;
+      min-width: 0;
+    }
+
+    .chip {
+      height: 26px;
+      padding: 0 10px;
+      border: 1px solid rgba(35,43,56,.95);
+      border-radius: 999px;
+      background: rgba(21,26,35,.82);
+      color: var(--muted);
+      font-size: 12px;
+      white-space: nowrap;
+    }
+
+    .chip.warn {
+      color: var(--amber);
+      border-color: rgba(232,162,61,.45);
+      background: rgba(232,162,61,.1);
+    }
+
+    select {
+      width: min(260px, 34vw);
+      height: 28px;
+      border: 1px solid rgba(35,43,56,.95);
+      border-radius: 9px;
+      background: #10141B;
+      color: var(--text);
+      padding: 0 30px 0 10px;
+      font-size: 12px;
+      outline: none;
+    }
+
+    select:focus {
+      border-color: rgba(25,194,157,.55);
+      box-shadow: 0 0 0 3px rgba(25,194,157,.12);
+    }
+
+    .bell {
+      flex: 0 0 auto;
+      display: grid;
+      place-items: center;
+      width: 28px;
+      height: 28px;
+      border: 1px solid rgba(35,43,56,.95);
+      border-radius: 9px;
+      background: #10141B;
+      color: var(--muted);
+      cursor: pointer;
+      padding: 0;
+    }
+
+    .bell svg {
+      width: 14px;
+      height: 14px;
+      fill: none;
+      stroke: currentColor;
+      stroke-width: 1.4;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+
+    .bell.on {
+      color: var(--done);
+      border-color: rgba(123,196,127,.4);
+      background: rgba(123,196,127,.08);
+    }
+
+    .bell.on svg {
+      fill: currentColor;
+    }
+
+    .bell:disabled,
+    .bell.disabled {
+      opacity: .35;
+      cursor: not-allowed;
+    }
+
+    .live {
+      gap: 7px;
+      color: var(--muted);
+      font-size: 11px;
+      white-space: nowrap;
+    }
+
+    .live-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--error);
+      box-shadow: 0 0 0 4px rgba(229,72,77,.12);
+      transition: background .2s ease, box-shadow .2s ease;
+    }
+
+    .live-dot.open {
+      background: var(--done);
+      box-shadow: 0 0 0 4px rgba(123,196,127,.13), 0 0 20px rgba(123,196,127,.28);
+    }
+
+    .layout {
+      position: relative;
+      display: flex;
+      min-height: 0;
+      height: 100%;
+    }
+
+    .rail {
+      flex: 0 0 auto;
+      display: flex;
+      flex-direction: column;
+      width: 248px;
+      min-height: 0;
+      border-right: 1px solid rgba(35,43,56,.85);
+      background: rgba(13,16,22,.55);
+      transition: width .22s ease;
+    }
+
+    .rail.collapsed {
+      width: 34px;
+    }
+
+    .rail-head {
+      flex: 0 0 auto;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      height: 40px;
+      padding: 0 12px;
+      border-bottom: 1px solid rgba(35,43,56,.85);
+    }
+
+    .rail.collapsed .rail-head {
+      padding: 0 6px;
+      justify-content: center;
+    }
+
+    .rail-title {
+      overflow: hidden;
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: .05em;
+      text-overflow: ellipsis;
+      text-transform: uppercase;
+      white-space: nowrap;
+    }
+
+    .rail.collapsed .rail-title {
+      display: none;
+    }
+
+    .rail-toggle {
+      flex: 0 0 auto;
+      width: 22px;
+      height: 22px;
+      border: 1px solid rgba(35,43,56,.95);
+      border-radius: 6px;
+      background: transparent;
+      color: var(--muted);
+      cursor: pointer;
+      font-size: 12px;
+      line-height: 1;
+      padding: 0;
+    }
+
+    .rail-body {
+      flex: 1 1 auto;
+      min-height: 0;
+      overflow-y: auto;
+      padding: 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .rail.collapsed .rail-body {
+      display: none;
+    }
+
+    .rail-row {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+    }
+
+    .rail-dot {
+      flex: 0 0 auto;
+      width: 9px;
+      height: 9px;
+      margin-top: 3px;
+      border-radius: 50%;
+      background: rgba(139,148,167,.4);
+    }
+
+    .rail-dot.active {
+      background: var(--openai);
+      animation: railPulse 1.4s ease-in-out infinite;
+    }
+
+    .rail-dot.done {
+      width: auto;
+      height: auto;
+      margin-top: -1px;
+      border-radius: 0;
+      background: none;
+      color: var(--done);
+      font-size: 11px;
+      font-weight: 700;
+    }
+
+    .rail-subject {
+      flex: 1 1 auto;
+      min-width: 0;
+      overflow: hidden;
+      color: var(--text);
+      font-size: 12px;
+      line-height: 1.3;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+    }
+
+    .rail-index {
+      flex: 0 0 auto;
+      color: var(--muted);
+      font-size: 10px;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .canvas {
+      position: relative;
+      flex: 1 1 auto;
+      overflow: auto;
+      min-height: 0;
+    }
+
+    .stage {
+      position: relative;
+      min-width: 820px;
+      min-height: 100%;
+      height: max(100%, var(--stage-h, 620px));
+    }
+
+    .links {
+      position: absolute;
+      inset: 0;
+      z-index: 1;
+      width: 100%;
+      height: 100%;
+      overflow: visible;
+      pointer-events: none;
+    }
+
+    .link {
+      fill: none;
+      stroke-linecap: round;
+      opacity: .96;
+      transition: opacity .6s ease, stroke .25s ease, stroke-width .25s ease;
+    }
+
+    .link.running {
+      stroke-dasharray: 9 10;
+      animation: flow 950ms linear infinite;
+      filter: drop-shadow(0 0 8px color-mix(in srgb, currentColor 42%, transparent));
+    }
+
+    .link.done {
+      stroke: #3A4453;
+    }
+
+    .link.enter {
+      animation: draw 350ms cubic-bezier(.2,.8,.2,1), flow 950ms linear infinite;
+    }
+
+    .link.dim {
+      opacity: .55;
+    }
+
+    .link.fade {
+      opacity: 0;
+    }
+
+    .hub {
+      position: absolute;
+      z-index: 3;
+      left: 8%;
+      top: 50%;
+      width: 224px;
+      height: 72px;
+      transform: translateY(-50%);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      background: linear-gradient(180deg, rgba(21,26,35,.98), rgba(17,21,29,.98));
+      box-shadow: var(--shadow);
+      transition: opacity .3s ease, filter .3s ease;
+    }
+
+    .hub::before {
+      content: "";
+      position: absolute;
+      inset: -8px;
+      border: 1px solid rgba(25,194,157,.18);
+      border-radius: 22px;
+      opacity: 0;
+      transform: scale(.98);
+      pointer-events: none;
+    }
+
+    .hub.active::before {
+      animation: hubPulse 1.9s ease-in-out infinite;
+    }
+
+    .hub.ended {
+      opacity: .56;
+      filter: saturate(.45);
+    }
+
+    .hub-inner {
+      display: grid;
+      grid-template-columns: 36px 1fr;
+      gap: 12px;
+      align-items: center;
+      height: 100%;
+      padding: 13px 16px;
+    }
+
+    .spark {
+      display: grid;
+      place-items: center;
+      width: 34px;
+      height: 34px;
+      border-radius: 12px;
+      background: rgba(217,119,87,.14);
+      color: var(--text);
+    }
+
+    .spark svg {
+      width: 18px;
+      height: 18px;
+      fill: none;
+      stroke: var(--text);
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      stroke-width: 1.6;
+    }
+
+    .brand-chip {
+      flex: 0 0 auto;
+      display: grid;
+      place-items: center;
+      width: 24px;
+      height: 24px;
+      border-radius: 8px;
+      background: color-mix(in srgb, var(--accent) 14%, transparent);
+    }
+
+    .brand-chip img {
+      width: 14px;
+      height: 14px;
+      object-fit: contain;
+    }
+
+    .hub-text {
+      min-width: 0;
+    }
+
+    .hub-title {
+      gap: 7px;
+      min-width: 0;
+      font-size: 14px;
+      font-weight: 700;
+    }
+
+    .hub-subtitle {
+      margin-top: 5px;
+      overflow: hidden;
+      color: var(--muted);
+      font-size: 11px;
+      line-height: 1.2;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .empty {
+      position: absolute;
+      z-index: 2;
+      left: 50%;
+      top: 50%;
+      width: min(360px, 42vw);
+      transform: translate(-4%, -50%);
+      color: rgba(139,148,167,.88);
+      font-size: 13px;
+      text-align: center;
+      white-space: pre-wrap;
+      pointer-events: none;
+    }
+
+    .agents {
+      position: absolute;
+      inset: 0;
+      z-index: 3;
+      pointer-events: none;
+    }
+
+    .agent {
+      position: absolute;
+      left: 52%;
+      width: 280px;
+      min-height: 108px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      background: rgba(21,26,35,.98);
+      box-shadow: var(--shadow);
+      overflow: hidden;
+      opacity: 1;
+      transform: translateY(var(--y, 0)) scale(1);
+      transform-origin: left center;
+      transition:
+        transform 300ms cubic-bezier(.2,.8,.2,1),
+        opacity 600ms ease,
+        border-color 220ms ease,
+        filter 600ms ease;
+      pointer-events: auto;
+      cursor: pointer;
+    }
+
+    .agent::before {
+      content: "";
+      position: absolute;
+      inset: 0 auto 0 0;
+      width: 4px;
+      background: var(--accent);
+      box-shadow: 0 0 20px color-mix(in srgb, var(--accent) 45%, transparent);
+    }
+
+    .agent.enter {
+      animation: nodeIn 250ms cubic-bezier(.2,.8,.2,1) both;
+    }
+
+    .agent.dim {
+      opacity: .55;
+      filter: saturate(.7);
+    }
+
+    .agent.fade {
+      opacity: 0;
+    }
+
+    .agent.error-flick {
+      animation: errorFlick 1.2s ease-out;
+    }
+
+    .agent-inner {
+      display: grid;
+      gap: 8px;
+      padding: 12px 14px 12px 16px;
+    }
+
+    .agent-head {
+      justify-content: space-between;
+      gap: 8px;
+      min-width: 0;
+    }
+
+    .agent-label {
+      flex: 1 1 auto;
+      overflow: hidden;
+      font-size: 13px;
+      font-weight: 650;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .step-tag {
+      flex: 0 0 auto;
+      padding: 3px 6px;
+      border: 1px solid rgba(25,194,157,.32);
+      border-radius: 999px;
+      background: rgba(25,194,157,.12);
+      color: var(--openai);
+      font-size: 10px;
+      font-weight: 700;
+      line-height: 1;
+    }
+
+    .model {
+      flex: 0 0 auto;
+      max-width: 126px;
+      overflow: hidden;
+      padding: 3px 7px;
+      border: 1px solid rgba(230,234,242,.09);
+      border-radius: 999px;
+      background: rgba(255,255,255,.045);
+      color: rgba(230,234,242,.76);
+      font-size: 10px;
+      font-weight: 700;
+      line-height: 1;
+      text-overflow: ellipsis;
+      text-transform: uppercase;
+      white-space: nowrap;
+    }
+
+    .description {
+      overflow: hidden;
+      color: rgba(230,234,242,.76);
+      font-size: 11px;
+      line-height: 1.25;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .status-line {
+      gap: 8px;
+      min-width: 0;
+      color: var(--muted);
+      font-family: var(--mono);
+      font-size: 11px;
+      line-height: 1.2;
+    }
+
+    .status-line.done {
+      flex-direction: column;
+      align-items: stretch;
+      gap: 4px;
+    }
+
+    .status-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+    }
+
+    .final-message {
+      overflow: hidden;
+      color: rgba(230,234,242,.76);
+      font-family: var(--font);
+      font-size: 11px;
+      font-style: italic;
+      line-height: 1.3;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+    }
+
+    .pulse-dot {
+      flex: 0 0 auto;
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: var(--accent);
+      animation: dotPulse 1.35s ease-in-out infinite;
+    }
+
+    .pulse-dot.stall {
+      background: var(--amber);
+      animation: stallPulse 1.35s ease-in-out infinite;
+    }
+
+    .activity {
+      min-width: 0;
+      flex: 1 1 auto;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .activity.narrative {
+      font-style: italic;
+    }
+
+    .timer {
+      flex: 0 0 auto;
+      color: rgba(230,234,242,.7);
+      font-variant-numeric: tabular-nums;
+    }
+
+    .done-pill {
+      flex: 0 0 auto;
+      justify-content: center;
+      width: 18px;
+      height: 18px;
+      border-radius: 999px;
+      background: rgba(123,196,127,.14);
+      color: var(--done);
+      font-family: var(--font);
+      font-size: 12px;
+      font-weight: 800;
+    }
+
+    .files-row {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 5px;
+      min-height: 20px;
+    }
+
+    .file-chip {
+      max-width: 84px;
+      overflow: hidden;
+      padding: 2px 7px;
+      border: 1px solid rgba(230,234,242,.1);
+      border-radius: 999px;
+      background: rgba(255,255,255,.035);
+      color: var(--muted);
+      font-family: var(--mono);
+      font-size: 10px;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      transition: border-color .2s ease, color .2s ease;
+    }
+
+    .file-chip.file-more {
+      max-width: 36px;
+      color: rgba(230,234,242,.55);
+    }
+
+    .file-chip.collision {
+      border-color: rgba(232,162,61,.55);
+      color: var(--amber);
+      animation: chipPulse 1.4s ease-in-out infinite;
+    }
+
+    .file-empty {
+      color: rgba(139,148,167,.5);
+      font-size: 10px;
+      font-style: italic;
+    }
+
+    .drawer {
+      position: absolute;
+      z-index: 20;
+      top: 0;
+      right: 0;
+      bottom: 0;
+      width: 360px;
+      max-width: 92vw;
+      display: flex;
+      flex-direction: column;
+      background: var(--card);
+      border-left: 1px solid var(--border);
+      box-shadow: -12px 0 32px rgba(0,0,0,.4);
+      transform: translateX(100%);
+      transition: transform .3s cubic-bezier(.2,.8,.2,1);
+    }
+
+    .drawer.open {
+      transform: translateX(0);
+    }
+
+    .drawer-head {
+      flex: 0 0 auto;
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      padding: 16px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .drawer-title {
+      flex: 1 1 auto;
+      min-width: 0;
+    }
+
+    .drawer-label {
+      overflow: hidden;
+      font-size: 14px;
+      font-weight: 700;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .drawer-sub {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-top: 6px;
+    }
+
+    .drawer-status {
+      color: var(--muted);
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: .04em;
+      text-transform: uppercase;
+    }
+
+    .drawer-status.done {
+      color: var(--done);
+    }
+
+    .drawer-close {
+      flex: 0 0 auto;
+      width: 26px;
+      height: 26px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: transparent;
+      color: var(--muted);
+      cursor: pointer;
+      font-size: 12px;
+    }
+
+    .drawer-body {
+      flex: 1 1 auto;
+      min-height: 0;
+      overflow-y: auto;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    .drawer-desc {
+      color: rgba(230,234,242,.8);
+      font-size: 12px;
+      line-height: 1.4;
+    }
+
+    .drawer-final {
+      padding: 10px 12px;
+      border: 1px solid rgba(123,196,127,.22);
+      border-radius: 10px;
+      background: rgba(123,196,127,.08);
+      color: rgba(230,234,242,.85);
+      font-size: 12px;
+      font-style: italic;
+      line-height: 1.4;
+    }
+
+    .drawer-log-head {
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: .05em;
+      text-transform: uppercase;
+    }
+
+    .drawer-log {
+      flex: 1 1 auto;
+      min-height: 80px;
+      overflow-y: auto;
+    }
+
+    .log-row {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 8px;
+      padding: 5px 0;
+      border-bottom: 1px solid rgba(35,43,56,.55);
+      color: rgba(230,234,242,.8);
+      font-family: var(--mono);
+      font-size: 11px;
+      line-height: 1.35;
+    }
+
+    .log-row.error {
+      color: var(--error);
+    }
+
+    .log-text {
+      min-width: 0;
+      overflow-wrap: anywhere;
+    }
+
+    .log-ms {
+      flex: 0 0 auto;
+      color: var(--muted);
+      font-variant-numeric: tabular-nums;
+    }
+
+    .log-empty {
+      padding: 8px 0;
+      color: var(--muted);
+      font-family: var(--mono);
+      font-size: 11px;
+    }
+
+    @keyframes nodeIn {
+      from {
+        opacity: 0;
+        transform: translateY(var(--y, 0)) scale(.85);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(var(--y, 0)) scale(1);
+      }
+    }
+
+    @keyframes draw {
+      from { stroke-dashoffset: 420; }
+      to { stroke-dashoffset: 0; }
+    }
+
+    @keyframes flow {
+      to { stroke-dashoffset: -38; }
+    }
+
+    @keyframes dotPulse {
+      0%, 100% {
+        opacity: .56;
+        transform: scale(.75);
+        box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent) 28%, transparent);
+      }
+      50% {
+        opacity: 1;
+        transform: scale(1);
+        box-shadow: 0 0 0 5px color-mix(in srgb, var(--accent) 12%, transparent);
+      }
+    }
+
+    @keyframes stallPulse {
+      0%, 100% {
+        opacity: .6;
+        transform: scale(.8);
+        box-shadow: 0 0 0 0 rgba(232,162,61,.32);
+      }
+      50% {
+        opacity: 1;
+        transform: scale(1);
+        box-shadow: 0 0 0 5px rgba(232,162,61,.16);
+      }
+    }
+
+    @keyframes railPulse {
+      0%, 100% {
+        opacity: .55;
+        transform: scale(.8);
+      }
+      50% {
+        opacity: 1;
+        transform: scale(1);
+      }
+    }
+
+    @keyframes chipPulse {
+      0%, 100% { box-shadow: 0 0 0 0 rgba(232,162,61,.45); }
+      50% { box-shadow: 0 0 0 4px rgba(232,162,61,.16); }
+    }
+
+    @keyframes errorFlick {
+      0% {
+        border-color: var(--border);
+        box-shadow: var(--shadow);
+      }
+      28% {
+        border-color: rgba(229,72,77,.9);
+        box-shadow: 0 0 0 3px rgba(229,72,77,.32), var(--shadow);
+      }
+      100% {
+        border-color: var(--border);
+        box-shadow: var(--shadow);
+      }
+    }
+
+    @keyframes hubPulse {
+      0%, 100% {
+        opacity: .2;
+        transform: scale(.98);
+        box-shadow: 0 0 0 rgba(25,194,157,0);
+      }
+      50% {
+        opacity: 1;
+        transform: scale(1);
+        box-shadow: 0 0 34px rgba(25,194,157,.12);
+      }
+    }
+
+    @media (max-width: 899px) {
+      .rail {
+        display: none !important;
+      }
+    }
+
+    @media (max-width: 760px) {
+      .topbar {
+        padding: 0 12px;
+        gap: 10px;
+      }
+
+      .brand span {
+        max-width: 148px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+
+      .chip {
+        display: none;
+      }
+
+      select {
+        width: 142px;
+      }
+
+      .stage {
+        min-width: 720px;
+      }
+
+      .hub {
+        left: 34px;
+      }
+
+      .agent {
+        left: 370px;
+      }
+
+      .empty {
+        left: 398px;
+        width: 250px;
+        transform: translateY(-50%);
+      }
+
+      .drawer {
+        width: 320px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <header class="topbar">
+      <div class="brand">
+        <span class="logo" aria-hidden="true">
+          <svg viewBox="0 0 16 16">
+            <path d="M8 1.8v12.4M1.8 8h12.4M3.8 3.8l8.4 8.4M12.2 3.8 3.8 12.2"></path>
+          </svg>
+        </span>
+        <span>LumenADE · Fleet view</span>
+      </div>
+      <div class="controls">
+        <div class="chip" id="runningCount">0 running</div>
+        <div class="chip warn" id="collisionChip">⚠ file collision</div>
+        <select id="sessionPicker" aria-label="Session">
+          <option value="__latest">Follow latest</option>
+        </select>
+        <button class="bell" id="notifyToggle" type="button" aria-pressed="false" aria-label="Toggle desktop notifications" title="Notify when a turn finishes">
+          <svg viewBox="0 0 16 16" aria-hidden="true">
+            <path d="M8 1.6c-2 0-3.5 1.6-3.5 3.6v2.05c0 .62-.24 1.22-.66 1.68l-.78.85a.7.7 0 0 0 .52 1.17h8.84a.7.7 0 0 0 .52-1.17l-.78-.85a2.5 2.5 0 0 1-.66-1.68V5.2c0-2-1.5-3.6-3.5-3.6Z"></path>
+            <path d="M6.25 13.3a1.75 1.75 0 0 0 3.5 0"></path>
+          </svg>
+        </button>
+        <div class="live" aria-label="SSE connection">
+          <span class="live-dot" id="liveDot"></span>
+          <span id="liveLabel">reconnecting</span>
+        </div>
+      </div>
+    </header>
+
+    <div class="layout" id="layout">
+      <aside class="rail" id="rail" aria-label="Plan">
+        <div class="rail-head">
+          <span class="rail-title">Plan</span>
+          <button class="rail-toggle" id="railToggle" type="button" aria-label="Collapse plan rail">‹</button>
+        </div>
+        <div class="rail-body" id="railBody"></div>
+      </aside>
+
+      <main class="canvas" id="canvas">
+        <div class="stage" id="stage">
+          <svg class="links" id="links"></svg>
+          <section class="hub" id="hub" aria-label="Orchestrator">
+            <div class="hub-inner">
+              <div class="spark" aria-hidden="true">
+                <svg viewBox="0 0 24 24">
+                  <circle cx="12" cy="12" r="8.5"></circle>
+                  <circle cx="12" cy="12" r="2.2" fill="currentColor" stroke="none"></circle>
+                </svg>
+              </div>
+              <div class="hub-text">
+                <div class="hub-title" id="hubTitle">Fable 5</div>
+                <div class="hub-subtitle" id="hubSubtitle">Orchestrator · No session</div>
+              </div>
+            </div>
+          </section>
+          <div class="empty" id="empty">Fleet idle — run  npm run demo  to see it move.</div>
+          <section class="agents" id="agents" aria-label="Agent fleet"></section>
+        </div>
+      </main>
+
+      <aside class="drawer" id="drawer" aria-hidden="true">
+        <div class="drawer-head">
+          <span class="brand-chip"><img id="drawerImg" alt=""></span>
+          <div class="drawer-title">
+            <div class="drawer-label" id="drawerLabel"></div>
+            <div class="drawer-sub">
+              <span class="model" id="drawerModel"></span>
+              <span class="drawer-status" id="drawerStatus"></span>
+            </div>
+          </div>
+          <button class="drawer-close" id="drawerClose" type="button" aria-label="Close">✕</button>
+        </div>
+        <div class="drawer-body">
+          <div class="drawer-desc" id="drawerDesc"></div>
+          <div class="files-row" id="drawerFiles"></div>
+          <div class="drawer-final" id="drawerFinal" hidden></div>
+          <div class="drawer-log-head">Activity log</div>
+          <div class="drawer-log" id="drawerLog"></div>
+        </div>
+      </aside>
+    </div>
+  </div>
+
+  <script>
+    (() => {
+      const FOLLOW = "__latest";
+      const RHYTHM = 128;
+      const CARD_H = 108;
+      const HUB_W = 224;
+      const NARRATIVE_FRESH_MS = 90000;
+      // Brand marks (white variants, via Brandfetch) inlined as data URIs so the
+      // page keeps its no-external-requests guarantee.
+      const LOGOS = {
+        anthropic: "data:image/svg+xml;base64,PHN2ZyB2ZXJzaW9uPSIxLjEiIGlkPSJMYXllcl8xIiB4bWxuczp4PSJuc19leHRlbmQ7IiB4bWxuczppPSJuc19haTsiIHhtbG5zOmdyYXBoPSJuc19ncmFwaHM7IiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHhtbG5zOnhsaW5rPSJodHRwOi8vd3d3LnczLm9yZy8xOTk5L3hsaW5rIiB4PSIwcHgiIHk9IjBweCIgdmlld0JveD0iMCAwIDkyLjIgNjUiIHN0eWxlPSJlbmFibGUtYmFja2dyb3VuZDpuZXcgMCAwIDkyLjIgNjU7IiB4bWw6c3BhY2U9InByZXNlcnZlIj4KIDxzdHlsZSB0eXBlPSJ0ZXh0L2NzcyI+CiAgLnN0MHtmaWxsOiNGRkZGRkY7fQogPC9zdHlsZT4KIDxtZXRhZGF0YT4KICA8c2Z3IHhtbG5zPSJuc19zZnc7Ij4KICAgPHNsaWNlcz4KICAgPC9zbGljZXM+CiAgIDxzbGljZVNvdXJjZUJvdW5kcyBib3R0b21MZWZ0T3JpZ2luPSJ0cnVlIiBoZWlnaHQ9IjY1IiB3aWR0aD0iOTIuMiIgeD0iLTQzLjciIHk9Ii05OCI+CiAgIDwvc2xpY2VTb3VyY2VCb3VuZHM+CiAgPC9zZnc+CiA8L21ldGFkYXRhPgogPHBhdGggY2xhc3M9InN0MCIgZD0iTTY2LjUsMEg1Mi40bDI1LjcsNjVoMTQuMUw2Ni41LDB6IE0yNS43LDBMMCw2NWgxNC40bDUuMy0xMy42aDI2LjlMNTEuOCw2NWgxNC40TDQwLjUsMEM0MC41LDAsMjUuNywwLDI1LjcsMHoKCSBNMjQuMywzOS4zbDguOC0yMi44bDguOCwyMi44SDI0LjN6Ij4KIDwvcGF0aD4KPC9zdmc+",
+        openai: "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNzIxIiBoZWlnaHQ9IjcyMSIgdmlld0JveD0iMCAwIDcyMSA3MjEiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxnIGNsaXAtcGF0aD0idXJsKCNjbGlwMF8xNjM3XzI5MzUpIj4KPGcgY2xpcC1wYXRoPSJ1cmwoI2NsaXAxXzE2MzdfMjkzNSkiPgo8cGF0aCBkPSJNMzA0LjI0NiAyOTUuNDExVjI0OS44MjhDMzA0LjI0NiAyNDUuOTg5IDMwNS42ODcgMjQzLjEwOSAzMDkuMDQ0IDI0MS4xOTFMNDAwLjY5MiAxODguNDEyQzQxMy4xNjcgMTgxLjIxNSA0MjguMDQyIDE3Ny44NTggNDQzLjM5NCAxNzcuODU4QzUwMC45NzEgMTc3Ljg1OCA1MzcuNDQgMjIyLjQ4MiA1MzcuNDQgMjY5Ljk4MkM1MzcuNDQgMjczLjM0IDUzNy40NCAyNzcuMTc5IDUzNi45NTkgMjgxLjAxOEw0NDEuOTU0IDIyNS4zNThDNDM2LjE5NyAyMjIgNDMwLjQzNyAyMjIgNDI0LjY4IDIyNS4zNThMMzA0LjI0NiAyOTUuNDExWk01MTguMjQ1IDQ3Mi45NDVWMzY0LjAyNEM1MTguMjQ1IDM1Ny4zMDQgNTE1LjM2NCAzNTIuNTA3IDUwOS42MDggMzQ5LjE0OUwzODkuMTc0IDI3OS4wOTZMNDI4LjUxOSAyNTYuNTQzQzQzMS44NzcgMjU0LjYyNiA0MzQuNzU3IDI1NC42MjYgNDM4LjExNSAyNTYuNTQzTDUyOS43NjIgMzA5LjMyM0M1NTYuMTU0IDMyNC42NzkgNTczLjkwNSAzNTcuMzA0IDU3My45MDUgMzg4Ljk3MUM1NzMuOTA1IDQyNS40MzYgNTUyLjMxNSA0NTkuMDI0IDUxOC4yNDUgNDcyLjk0MVY0NzIuOTQ1Wk0yNzUuOTM3IDM3Ni45ODJMMjM2LjU5MiAzNTMuOTUyQzIzMy4yMzUgMzUyLjAzNCAyMzEuNzk0IDM0OS4xNTQgMjMxLjc5NCAzNDUuMzE1VjIzOS43NTZDMjMxLjc5NCAxODguNDE2IDI3MS4xMzkgMTQ5LjU0OCAzMjQuNCAxNDkuNTQ4QzM0NC41NTUgMTQ5LjU0OCAzNjMuMjY0IDE1Ni4yNjggMzc5LjEwMiAxNjguMjYyTDI4NC41NzggMjIyLjk2NEMyNzguODIyIDIyNi4zMjEgMjc1Ljk0MiAyMzEuMTE5IDI3NS45NDIgMjM3LjgzOFYzNzYuOTg2TDI3NS45MzcgMzc2Ljk4MlpNMzYwLjYyNiA0MjUuOTIyTDMwNC4yNDYgMzk0LjI1NVYzMjcuMDgzTDM2MC42MjYgMjk1LjQxNkw0MTcuMDAyIDMyNy4wODNWMzk0LjI1NUwzNjAuNjI2IDQyNS45MjJaTTM5Ni44NTIgNTcxLjc4OUMzNzYuNjk4IDU3MS43ODkgMzU3Ljk4OSA1NjUuMDcgMzQyLjE1MSA1NTMuMDc1TDQzNi42NzQgNDk4LjM3NEM0NDIuNDMxIDQ5NS4wMTcgNDQ1LjMxMSA0OTAuMjE5IDQ0NS4zMTEgNDgzLjQ5OVYzNDQuMzUyTDQ4NS4xMzggMzY3LjM4MkM0ODguNDk1IDM2OS4yOTkgNDg5LjkzNiAzNzIuMTc5IDQ4OS45MzYgMzc2LjAxOFY0ODEuNTc3QzQ4OS45MzYgNTMyLjkxNyA0NTAuMTA5IDU3MS43ODUgMzk2Ljg1MiA1NzEuNzg1VjU3MS43ODlaTTI4My4xMzQgNDY0Ljc5TDE5MS40ODYgNDEyLjAxQzE2NS4wOTQgMzk2LjY1NCAxNDcuMzQzIDM2NC4wMjkgMTQ3LjM0MyAzMzIuMzYyQzE0Ny4zNDMgMjk1LjQxNiAxNjkuNDE1IDI2Mi4zMDkgMjAzLjQ4IDI0OC4zOTNWMzU3Ljc5MUMyMDMuNDggMzY0LjUxIDIwNi4zNjEgMzY5LjMwOCAyMTIuMTE3IDM3Mi42NjVMMzMyLjA3NCA0NDIuMjM3TDI5Mi43MjkgNDY0Ljc5QzI4OS4zNzIgNDY2LjcwNyAyODYuNDkxIDQ2Ni43MDcgMjgzLjEzNCA0NjQuNzlaTTI3Ny44NTkgNTQzLjQ4QzIyMy42MzkgNTQzLjQ4IDE4My44MTMgNTAyLjY5NSAxODMuODEzIDQ1Mi4zMTRDMTgzLjgxMyA0NDguNDc1IDE4NC4yOTQgNDQ0LjYzNiAxODQuNzcxIDQ0MC43OTdMMjc5LjI5NSA0OTUuNDk4QzI4NS4wNTEgNDk4Ljg1NiAyOTAuODEyIDQ5OC44NTYgMjk2LjU2OCA0OTUuNDk4TDQxNy4wMDIgNDI1LjkyN1Y0NzEuNTA5QzQxNy4wMDIgNDc1LjM0OSA0MTUuNTYyIDQ3OC4yMjkgNDEyLjIwNCA0ODAuMTQ2TDMyMC41NTcgNTMyLjkyNkMzMDguMDgxIDU0MC4xMjIgMjkzLjIwNiA1NDMuNDggMjc3Ljg1NCA1NDMuNDhIMjc3Ljg1OVpNMzk2Ljg1MiA2MDAuNTc2QzQ1NC45MTEgNjAwLjU3NiA1MDMuMzcgNTU5LjMxMyA1MTQuNDEgNTA0LjYxMkM1NjguMTQ5IDQ5MC42OTYgNjAyLjY5NiA0NDAuMzE1IDYwMi42OTYgMzg4Ljk3NkM2MDIuNjk2IDM1NS4zODcgNTg4LjMwMyAzMjIuNzYyIDU2Mi4zOTIgMjk5LjI1QzU2NC43OTEgMjg5LjE3MyA1NjYuMjMxIDI3OS4wOTYgNTY2LjIzMSAyNjkuMDI0QzU2Ni4yMzEgMjAwLjQxMSA1MTAuNTcxIDE0OS4wNjcgNDQ2LjI3NCAxNDkuMDY3QzQzMy4zMjIgMTQ5LjA2NyA0MjAuODQ2IDE1MC45ODQgNDA4LjM3IDE1NS4zMDVDMzg2Ljc3NSAxMzQuMTkyIDM1Ny4wMjYgMTIwLjc1OCAzMjQuNCAxMjAuNzU4QzI2Ni4zNDIgMTIwLjc1OCAyMTcuODgzIDE2Mi4wMiAyMDYuODQzIDIxNi43MjFDMTUzLjEwNCAyMzAuNjM3IDExOC41NTcgMjgxLjAxOCAxMTguNTU3IDMzMi4zNTdDMTE4LjU1NyAzNjUuOTQ2IDEzMi45NSAzOTguNTcxIDE1OC44NjEgNDIyLjA4M0MxNTYuNDYyIDQzMi4xNiAxNTUuMDIyIDQ0Mi4yMzcgMTU1LjAyMiA0NTIuMzA5QzE1NS4wMjIgNTIwLjkyMiAyMTAuNjgyIDU3Mi4yNjYgMjc0Ljk3OCA1NzIuMjY2QzI4Ny45MzEgNTcyLjI2NiAzMDAuNDA3IDU3MC4zNDkgMzEyLjg4MyA1NjYuMDI4QzMzNC40NzMgNTg3LjE0MSAzNjQuMjIyIDYwMC41NzYgMzk2Ljg1MiA2MDAuNTc2WiIgZmlsbD0id2hpdGUiLz4KPC9nPgo8L2c+CjxkZWZzPgo8Y2xpcFBhdGggaWQ9ImNsaXAwXzE2MzdfMjkzNSI+CjxyZWN0IHdpZHRoPSI3MjAiIGhlaWdodD0iNzIwIiBmaWxsPSJ3aGl0ZSIgdHJhbnNmb3JtPSJ0cmFuc2xhdGUoMC42MDY5MzQgMC44OTk5MDIpIi8+CjwvY2xpcFBhdGg+CjxjbGlwUGF0aCBpZD0iY2xpcDFfMTYzN18yOTM1Ij4KPHJlY3Qgd2lkdGg9IjQ4NC4xMzkiIGhlaWdodD0iNDc5LjgxOCIgZmlsbD0id2hpdGUiIHRyYW5zZm9ybT0idHJhbnNsYXRlKDExOC41NTcgMTIwLjc1OCkiLz4KPC9jbGlwUGF0aD4KPC9kZWZzPgo8L3N2Zz4K"
+      };
+      const state = {
+        sessions: new Map(),
+        agents: new Map(),
+        plans: new Map(),
+        config: { hubTitle: "Fable 5", stallThresholdMs: 120000 },
+        selected: FOLLOW,
+        connected: false,
+        visible: new Set(),
+        drawerAgentId: null,
+        prevTurnActive: new Map(),
+        lastSeenErrorAt: new Map(),
+        pendingErrorFlick: new Set()
+      };
+      const els = {
+        layout: document.getElementById("layout"),
+        canvas: document.getElementById("canvas"),
+        stage: document.getElementById("stage"),
+        links: document.getElementById("links"),
+        hub: document.getElementById("hub"),
+        hubTitle: document.getElementById("hubTitle"),
+        hubSubtitle: document.getElementById("hubSubtitle"),
+        empty: document.getElementById("empty"),
+        agents: document.getElementById("agents"),
+        picker: document.getElementById("sessionPicker"),
+        running: document.getElementById("runningCount"),
+        collisionChip: document.getElementById("collisionChip"),
+        liveDot: document.getElementById("liveDot"),
+        liveLabel: document.getElementById("liveLabel"),
+        notifyToggle: document.getElementById("notifyToggle"),
+        rail: document.getElementById("rail"),
+        railToggle: document.getElementById("railToggle"),
+        railBody: document.getElementById("railBody"),
+        drawer: document.getElementById("drawer"),
+        drawerImg: document.getElementById("drawerImg"),
+        drawerLabel: document.getElementById("drawerLabel"),
+        drawerModel: document.getElementById("drawerModel"),
+        drawerStatus: document.getElementById("drawerStatus"),
+        drawerDesc: document.getElementById("drawerDesc"),
+        drawerFiles: document.getElementById("drawerFiles"),
+        drawerFinal: document.getElementById("drawerFinal"),
+        drawerLog: document.getElementById("drawerLog"),
+        drawerClose: document.getElementById("drawerClose")
+      };
+      const nodes = new Map();
+      const paths = new Map();
+
+      function parseTime(value) {
+        const n = Date.parse(value || "");
+        return Number.isFinite(n) ? n : 0;
+      }
+
+      function basename(path) {
+        if (!path) return "unknown";
+        const parts = String(path).split("/").filter(Boolean);
+        return parts.at(-1) || path;
+      }
+
+      function elapsed(start, end) {
+        const a = parseTime(start);
+        const b = end ? parseTime(end) : Date.now();
+        const seconds = Math.max(0, Math.floor((b - a) / 1000));
+        return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`;
+      }
+
+      function accent(agent) {
+        return agent.provider === "openai" ? "var(--openai)" : "var(--anthropic)";
+      }
+
+      function latestSessionId() {
+        return sortedSessions()[0]?.id || null;
+      }
+
+      function activeSession() {
+        const id = state.selected === FOLLOW ? latestSessionId() : state.selected;
+        return id ? state.sessions.get(id) : null;
+      }
+
+      function sortedSessions() {
+        return [...state.sessions.values()]
+          .sort((a, b) => parseTime(b.lastActivityAt) - parseTime(a.lastActivityAt));
+      }
+
+      function selectedAgents(session) {
+        if (!session) return [];
+        const now = Date.now();
+        return [...state.agents.values()]
+          .filter(agent => agent.sessionId === session.id)
+          .filter(agent => !agent.endedAt || now - parseTime(agent.endedAt) < 181000)
+          .sort((a, b) => parseTime(a.startedAt) - parseTime(b.startedAt));
+      }
+
+      function upsertSession(session) {
+        if (session?.id) state.sessions.set(session.id, session);
+      }
+
+      function upsertAgent(agent) {
+        if (agent?.id) state.agents.set(agent.id, agent);
+      }
+
+      // --- plan helpers -----------------------------------------------------
+
+      function currentPlan(session) {
+        return session ? state.plans.get(session.id) || null : null;
+      }
+
+      function extractDocLines(markdown) {
+        return String(markdown || "")
+          .split("\n")
+          .map(line => line.trim())
+          .filter(line => /^(-|\*|\d+\.)\s+/.test(line))
+          .map(line => line.replace(/^(-|\*|\d+\.)\s+/, ""));
+      }
+
+      function stepIndex(plan, stepId) {
+        if (!plan || !stepId) return -1;
+        return (plan.steps || []).findIndex(step => step.id === stepId);
+      }
+
+      // --- stall / narrative --------------------------------------------------
+
+      function isStalled(agent) {
+        if (agent.status !== "running") return false;
+        const last = parseTime(agent.lastActivityAt || agent.startedAt);
+        const threshold = state.config.stallThresholdMs || 120000;
+        return last > 0 && Date.now() - last > threshold;
+      }
+
+      function usingNarrative(agent, stalled) {
+        return !stalled && Boolean(agent.narrative) && agent.narrativeAt &&
+          Date.now() - parseTime(agent.narrativeAt) < NARRATIVE_FRESH_MS;
+      }
+
+      function applyRunningStatus(node, agent) {
+        const stalled = isStalled(agent);
+        const dot = node.querySelector(".pulse-dot");
+        if (dot) dot.classList.toggle("stall", stalled);
+        const activityEl = node.querySelector(".activity");
+        if (!activityEl) return;
+        const showNarrative = usingNarrative(agent, stalled);
+        activityEl.classList.toggle("narrative", showNarrative);
+        if (stalled) {
+          activityEl.textContent = `stalled · ${elapsed(agent.lastActivityAt || agent.startedAt)}`;
+        } else if (showNarrative) {
+          activityEl.textContent = agent.narrative;
+        } else {
+          activityEl.textContent = agent.currentActivity || "starting";
+        }
+      }
+
+      // --- collisions -----------------------------------------------------
+
+      function computeCollisions(agents) {
+        const counts = new Map();
+        for (const agent of agents) {
+          if (agent.status !== "running") continue;
+          for (const file of new Set(agent.files || [])) {
+            counts.set(file, (counts.get(file) || 0) + 1);
+          }
+        }
+        const collisions = new Set();
+        for (const [file, n] of counts) if (n >= 2) collisions.add(file);
+        return collisions;
+      }
+
+      function renderFiles(container, agent, collisions) {
+        const files = agent.files || [];
+        container.innerHTML = "";
+        if (!files.length) {
+          const span = document.createElement("span");
+          span.className = "file-empty";
+          span.textContent = "no files touched";
+          container.append(span);
+          return;
+        }
+        const shown = files.slice(0, 3);
+        for (const file of shown) {
+          const chip = document.createElement("span");
+          chip.className = "file-chip";
+          chip.textContent = basename(file);
+          chip.title = file;
+          if (agent.status === "running" && collisions.has(file)) chip.classList.add("collision");
+          container.append(chip);
+        }
+        const overflow = files.length - shown.length;
+        if (overflow > 0) {
+          const chip = document.createElement("span");
+          chip.className = "file-chip file-more";
+          chip.textContent = `+${overflow}`;
+          container.append(chip);
+        }
+      }
+
+      function renderStepTag(node, agent, plan) {
+        const tag = node.querySelector(".step-tag");
+        const idx = stepIndex(plan, agent.stepId);
+        if (agent.stepId && idx >= 0) {
+          tag.hidden = false;
+          tag.textContent = `S${idx + 1}`;
+        } else {
+          tag.hidden = true;
+        }
+      }
+
+      // --- plan rail --------------------------------------------------------
+
+      function renderRail(session) {
+        const plan = currentPlan(session);
+        const narrow = window.innerWidth < 900;
+        const hasPlan = Boolean(plan && (((plan.steps || []).length) || plan.doc));
+        const visible = !narrow && hasPlan;
+        els.rail.style.display = visible ? "flex" : "none";
+        els.rail.setAttribute("aria-hidden", visible ? "false" : "true");
+        if (!visible) return;
+
+        const collapsed = localStorage.getItem("fleet.railCollapsed") === "1";
+        els.rail.classList.toggle("collapsed", collapsed);
+        els.railToggle.textContent = collapsed ? "›" : "‹";
+        els.railToggle.setAttribute("aria-expanded", String(!collapsed));
+
+        els.railBody.innerHTML = "";
+        const steps = plan.steps || [];
+        if (steps.length) {
+          steps.forEach((step, i) => {
+            const row = document.createElement("div");
+            row.className = "rail-row";
+            const dot = document.createElement("span");
+            const status = step.status === "done" ? "done" : step.status === "active" ? "active" : "pending";
+            dot.className = `rail-dot ${status}`;
+            if (status === "done") dot.textContent = "✓";
+            const subject = document.createElement("span");
+            subject.className = "rail-subject";
+            subject.textContent = step.subject || "(untitled step)";
+            const index = document.createElement("span");
+            index.className = "rail-index";
+            index.textContent = String(i + 1);
+            row.append(dot, subject, index);
+            els.railBody.append(row);
+          });
+        } else if (plan.doc) {
+          extractDocLines(plan.doc).slice(0, 12).forEach(text => {
+            const row = document.createElement("div");
+            row.className = "rail-row";
+            const dot = document.createElement("span");
+            dot.className = "rail-dot pending";
+            const subject = document.createElement("span");
+            subject.className = "rail-subject";
+            subject.textContent = text;
+            row.append(dot, subject);
+            els.railBody.append(row);
+          });
+        }
+      }
+
+      els.railToggle.addEventListener("click", () => {
+        const collapsed = localStorage.getItem("fleet.railCollapsed") === "1";
+        localStorage.setItem("fleet.railCollapsed", collapsed ? "0" : "1");
+        renderAll();
+      });
+
+      // --- drawer -----------------------------------------------------------
+
+      function logEntryNode(entry) {
+        const row = document.createElement("div");
+        row.className = "log-row" + (entry.error ? " error" : "");
+        const text = document.createElement("span");
+        text.className = "log-text";
+        const parts = [entry.tool || ""];
+        if (entry.hint) parts.push(entry.hint);
+        if (entry.file) parts.push(`(${basename(entry.file)})`);
+        text.textContent = parts.filter(Boolean).join(" · ");
+        row.append(text);
+        if (entry.ms != null) {
+          const ms = document.createElement("span");
+          ms.className = "log-ms";
+          ms.textContent = `${entry.ms}ms`;
+          row.append(ms);
+        }
+        return row;
+      }
+
+      function renderDrawerLog(entries) {
+        els.drawerLog.innerHTML = "";
+        if (!entries.length) {
+          const empty = document.createElement("div");
+          empty.className = "log-empty";
+          empty.textContent = "No activity yet.";
+          els.drawerLog.append(empty);
+          return;
+        }
+        entries.forEach(entry => els.drawerLog.append(logEntryNode(entry)));
+        els.drawerLog.scrollTop = els.drawerLog.scrollHeight;
+      }
+
+      function appendLogEntry(entry) {
+        const empty = els.drawerLog.querySelector(".log-empty");
+        if (empty) empty.remove();
+        els.drawerLog.append(logEntryNode(entry));
+        els.drawerLog.scrollTop = els.drawerLog.scrollHeight;
+      }
+
+      function renderDrawerHeader() {
+        const agent = state.agents.get(state.drawerAgentId);
+        if (!agent) return;
+        els.drawerImg.src = LOGOS[agent.provider] || LOGOS.anthropic;
+        els.drawerLabel.textContent = agent.label || agent.agentType || "Agent";
+        els.drawerModel.textContent = agent.model || "Claude";
+        const isDone = agent.status === "done";
+        els.drawerStatus.textContent = isDone ? "done" : "running";
+        els.drawerStatus.classList.toggle("done", isDone);
+        els.drawerDesc.textContent = agent.description || "Working in the session";
+        els.drawerFiles.innerHTML = "";
+        const files = agent.files || [];
+        if (!files.length) {
+          const span = document.createElement("span");
+          span.className = "file-empty";
+          span.textContent = "no files touched";
+          els.drawerFiles.append(span);
+        } else {
+          files.forEach(file => {
+            const chip = document.createElement("span");
+            chip.className = "file-chip";
+            chip.textContent = basename(file);
+            chip.title = file;
+            els.drawerFiles.append(chip);
+          });
+        }
+        if (isDone && agent.finalMessage) {
+          els.drawerFinal.hidden = false;
+          els.drawerFinal.textContent = agent.finalMessage;
+        } else {
+          els.drawerFinal.hidden = true;
+        }
+      }
+
+      function openDrawer(agentId) {
+        if (!agentId) return;
+        state.drawerAgentId = agentId;
+        els.drawer.classList.add("open");
+        els.drawer.setAttribute("aria-hidden", "false");
+        renderDrawerHeader();
+        els.drawerLog.innerHTML = "";
+        const loading = document.createElement("div");
+        loading.className = "log-empty";
+        loading.textContent = "Loading…";
+        els.drawerLog.append(loading);
+        fetch(`/agents/${encodeURIComponent(agentId)}/log`)
+          .then(r => r.json())
+          .then(data => {
+            if (state.drawerAgentId !== agentId) return;
+            renderDrawerLog(data.entries || []);
+          })
+          .catch(() => {
+            if (state.drawerAgentId !== agentId) return;
+            els.drawerLog.innerHTML = "";
+            const failed = document.createElement("div");
+            failed.className = "log-empty";
+            failed.textContent = "Failed to load log.";
+            els.drawerLog.append(failed);
+          });
+      }
+
+      function closeDrawer() {
+        state.drawerAgentId = null;
+        els.drawer.classList.remove("open");
+        els.drawer.setAttribute("aria-hidden", "true");
+      }
+
+      els.drawerClose.addEventListener("click", closeDrawer);
+      document.addEventListener("keydown", event => {
+        if (event.key === "Escape" && state.drawerAgentId) closeDrawer();
+      });
+      document.addEventListener("click", event => {
+        if (!state.drawerAgentId) return;
+        if (els.drawer.contains(event.target)) return;
+        if (event.target.closest(".agent")) return;
+        closeDrawer();
+      });
+
+      // --- notifications ------------------------------------------------------
+
+      function notifySupported() {
+        return typeof Notification !== "undefined";
+      }
+
+      function renderBell() {
+        const supported = notifySupported();
+        const denied = supported && Notification.permission === "denied";
+        const on = supported && Notification.permission === "granted" && localStorage.getItem("fleet.notify") === "1";
+        els.notifyToggle.classList.toggle("on", on);
+        const disabled = !supported || denied;
+        els.notifyToggle.classList.toggle("disabled", disabled);
+        els.notifyToggle.disabled = disabled;
+        els.notifyToggle.setAttribute("aria-pressed", String(on));
+      }
+
+      els.notifyToggle.addEventListener("click", () => {
+        if (!notifySupported() || Notification.permission === "denied") return;
+        const enabling = localStorage.getItem("fleet.notify") !== "1";
+        if (enabling && Notification.permission !== "granted") {
+          Notification.requestPermission().then(() => {
+            localStorage.setItem("fleet.notify", Notification.permission === "granted" ? "1" : "0");
+            renderBell();
+          });
+          return;
+        }
+        localStorage.setItem("fleet.notify", enabling ? "1" : "0");
+        renderBell();
+      });
+
+      function maybeNotify(session) {
+        if (localStorage.getItem("fleet.notify") !== "1") return;
+        if (!notifySupported() || Notification.permission !== "granted") return;
+        if (!document.hidden) return;
+        new Notification("Turn finished", {
+          body: `${basename(session.cwd)} · ${String(session.id).slice(0, 8)}`,
+          tag: session.id
+        });
+      }
+
+      // --- snapshot / fleet event handling --------------------------------
+
+      function replaceSnapshot(msg) {
+        closeDrawer();
+        state.sessions = new Map();
+        state.agents = new Map();
+        state.plans = new Map();
+        state.config = Object.assign({ hubTitle: "Fable 5", stallThresholdMs: 120000 }, msg.config || {});
+        state.prevTurnActive = new Map();
+        state.lastSeenErrorAt = new Map();
+        state.pendingErrorFlick = new Set();
+        (msg.sessions || []).forEach(upsertSession);
+        (msg.agents || []).forEach(upsertAgent);
+        (msg.plans || []).forEach(plan => {
+          if (plan?.sessionId) state.plans.set(plan.sessionId, plan);
+        });
+        for (const session of state.sessions.values()) {
+          state.prevTurnActive.set(session.id, Boolean(session.turnActive));
+        }
+        for (const agent of state.agents.values()) {
+          if (agent.lastErrorAt) state.lastSeenErrorAt.set(agent.id, parseTime(agent.lastErrorAt));
+        }
+        if (state.selected !== FOLLOW && !state.sessions.has(state.selected)) {
+          state.selected = FOLLOW;
+        }
+        renderAll();
+      }
+
+      function applyFleet(msg) {
+        if (msg.type === "plan" && msg.plan?.sessionId) {
+          state.plans.set(msg.plan.sessionId, msg.plan);
+        }
+        if (msg.type === "activity" && msg.agentId && msg.entry && state.drawerAgentId === msg.agentId) {
+          appendLogEntry(msg.entry);
+        }
+        if (msg.session) {
+          const prevActive = state.prevTurnActive.get(msg.session.id);
+          upsertSession(msg.session);
+          if (prevActive === true && msg.session.turnActive === false) {
+            maybeNotify(msg.session);
+          }
+          state.prevTurnActive.set(msg.session.id, Boolean(msg.session.turnActive));
+        }
+        if (msg.agent) {
+          const errAt = msg.agent.lastErrorAt ? parseTime(msg.agent.lastErrorAt) : 0;
+          const seenAt = state.lastSeenErrorAt.get(msg.agent.id) || 0;
+          if (errAt && errAt > seenAt) state.pendingErrorFlick.add(msg.agent.id);
+          if (errAt) state.lastSeenErrorAt.set(msg.agent.id, errAt);
+          upsertAgent(msg.agent);
+          if (state.drawerAgentId === msg.agent.id) renderDrawerHeader();
+        }
+        if (state.selected !== FOLLOW && !state.sessions.has(state.selected)) {
+          state.selected = FOLLOW;
+        }
+        renderAll();
+      }
+
+      function renderPicker() {
+        const sessions = sortedSessions();
+        const previous = state.selected;
+        els.picker.replaceChildren(new Option("Follow latest", FOLLOW));
+        for (const session of sessions) {
+          const label = `${basename(session.cwd)} · ${String(session.id).slice(0, 8)}`;
+          els.picker.add(new Option(label, session.id));
+        }
+        els.picker.value = sessions.some(s => s.id === previous) ? previous : FOLLOW;
+      }
+
+      function renderChrome(session, agents, collisions) {
+        const running = agents.filter(agent => agent.status === "running").length;
+        els.running.textContent = `${running} running`;
+        els.collisionChip.style.display = collisions.size > 0 ? "flex" : "none";
+        els.hub.classList.toggle("active", Boolean(session?.turnActive));
+        els.hub.classList.toggle("ended", Boolean(session?.ended));
+        const hubTitle = state.config.hubTitle || "Fable 5";
+        els.hubTitle.textContent = hubTitle;
+        els.hub.setAttribute("aria-label", `${hubTitle} orchestrator`);
+        const cwdBase = session ? basename(session.cwd) : "No session";
+        els.hubSubtitle.textContent = hubTitle === "Orchestrator" ? cwdBase : `Orchestrator · ${cwdBase}`;
+        els.empty.hidden = agents.length > 0;
+      }
+
+      function setConnection(open) {
+        state.connected = open;
+        els.liveDot.classList.toggle("open", open);
+        els.liveLabel.textContent = open ? "live" : "reconnecting";
+      }
+
+      function ensureNode(agent) {
+        let node = nodes.get(agent.id);
+        if (node) return node;
+        node = document.createElement("article");
+        node.className = "agent enter";
+        node.dataset.id = agent.id;
+        node.innerHTML = `
+          <div class="agent-inner">
+            <div class="agent-head">
+              <span class="brand-chip"><img alt=""><\/span>
+              <div class="agent-label"><\/div>
+              <span class="step-tag" hidden><\/span>
+              <div class="model"><\/div>
+            <\/div>
+            <div class="description"><\/div>
+            <div class="status-line"><\/div>
+            <div class="files-row"><\/div>
+          <\/div>
+        `;
+        node.addEventListener("click", () => openDrawer(node.dataset.id));
+        els.agents.append(node);
+        nodes.set(agent.id, node);
+        setTimeout(() => node.classList.remove("enter"), 280);
+        return node;
+      }
+
+      function ensurePath(agent) {
+        let path = paths.get(agent.id);
+        if (path) return path;
+        path = document.createElementNS("http" + "://www.w3.org/2000/svg", "path");
+        path.dataset.id = agent.id;
+        path.classList.add("link", "enter");
+        els.links.append(path);
+        paths.set(agent.id, path);
+        setTimeout(() => path.classList.remove("enter"), 380);
+        return path;
+      }
+
+      function renderAgent(node, agent, index, total, startY, plan, collisions) {
+        const y = startY + index * RHYTHM;
+        const isDone = agent.status === "done";
+        const doneAge = agent.endedAt ? Date.now() - parseTime(agent.endedAt) : 0;
+        node.style.setProperty("--y", `${y}px`);
+        node.style.setProperty("--accent", accent(agent));
+        node.classList.toggle("dim", isDone && doneAge > 20000);
+        node.classList.toggle("fade", isDone && doneAge > 180000);
+        node.querySelector(".agent-label").textContent = agent.label || agent.agentType || "Agent";
+        node.querySelector(".brand-chip img").src = LOGOS[agent.provider] || LOGOS.anthropic;
+        node.querySelector(".model").textContent = agent.model || "Claude";
+        node.querySelector(".description").textContent = agent.description || "Working in the session";
+        renderStepTag(node, agent, plan);
+
+        const status = node.querySelector(".status-line");
+        const finalElapsed = elapsed(agent.startedAt, agent.endedAt);
+        if (isDone) {
+          status.className = "status-line done";
+          status.innerHTML = `
+            <div class="status-top">
+              <span class="done-pill">✓<\/span>
+              <span class="timer"><\/span>
+            <\/div>
+            <div class="final-message"><\/div>
+          `;
+          status.querySelector(".timer").textContent = finalElapsed;
+          status.querySelector(".final-message").textContent = agent.finalMessage || "Complete";
+        } else {
+          status.className = "status-line";
+          status.innerHTML = `<span class="pulse-dot"><\/span><span class="activity"><\/span><span class="timer"><\/span>`;
+          status.querySelector(".timer").textContent = elapsed(agent.startedAt);
+          applyRunningStatus(node, agent);
+        }
+
+        renderFiles(node.querySelector(".files-row"), agent, collisions);
+
+        node.dataset.running = isDone ? "false" : "true";
+        node.dataset.startedAt = agent.startedAt || "";
+        node.dataset.endedAt = agent.endedAt || "";
+        node.dataset.index = String(index);
+        node.dataset.total = String(total);
+
+        if (state.pendingErrorFlick.has(agent.id)) {
+          state.pendingErrorFlick.delete(agent.id);
+          node.classList.remove("error-flick");
+          void node.offsetWidth;
+          node.classList.add("error-flick");
+          setTimeout(() => node.classList.remove("error-flick"), 1200);
+        }
+      }
+
+      function renderPath(path, agent, index, startY) {
+        const stageBox = els.stage.getBoundingClientRect();
+        const compact = window.matchMedia("(max-width: 760px)").matches;
+        const hubX = (compact ? 34 : stageBox.width * .08) + HUB_W;
+        const hubY = stageBox.height / 2;
+        const cardLeft = compact ? 370 : stageBox.width * .52;
+        const cardY = startY + index * RHYTHM + CARD_H / 2;
+        const mid = hubX + (cardLeft - hubX) * .5;
+        const d = `M ${hubX} ${hubY} C ${mid} ${hubY}, ${mid} ${cardY}, ${cardLeft} ${cardY}`;
+        const isDone = agent.status === "done";
+        const doneAge = agent.endedAt ? Date.now() - parseTime(agent.endedAt) : 0;
+        path.setAttribute("d", d);
+        path.setAttribute("stroke", isDone ? "#3A4453" : accent(agent));
+        path.setAttribute("stroke-width", isDone ? "1.5" : "2");
+        path.style.color = isDone ? "#3A4453" : accent(agent);
+        path.classList.toggle("running", !isDone);
+        path.classList.toggle("done", isDone);
+        path.classList.toggle("dim", isDone && doneAge > 20000);
+        path.classList.toggle("fade", isDone && doneAge > 180000);
+      }
+
+      function removeMissing(visibleIds) {
+        for (const [id, node] of nodes) {
+          if (visibleIds.has(id)) continue;
+          node.classList.add("fade");
+          setTimeout(() => node.remove(), 1000);
+          nodes.delete(id);
+        }
+        for (const [id, path] of paths) {
+          if (visibleIds.has(id)) continue;
+          path.classList.add("fade");
+          setTimeout(() => path.remove(), 1000);
+          paths.delete(id);
+        }
+      }
+
+      function renderAll() {
+        renderPicker();
+        const session = activeSession();
+        const agents = selectedAgents(session);
+        const plan = currentPlan(session);
+        const collisions = computeCollisions(agents);
+        renderRail(session);
+        const minHeight = Math.max(620, agents.length * RHYTHM + 220);
+        els.stage.style.setProperty("--stage-h", `${minHeight}px`);
+        renderChrome(session, agents, collisions);
+        const startY = Math.max(110, (minHeight - ((agents.length - 1) * RHYTHM + CARD_H)) / 2);
+        const visibleIds = new Set();
+        agents.forEach((agent, index) => {
+          visibleIds.add(agent.id);
+          const node = ensureNode(agent);
+          const path = ensurePath(agent);
+          renderAgent(node, agent, index, agents.length, startY, plan, collisions);
+          renderPath(path, agent, index, startY);
+        });
+        removeMissing(visibleIds);
+        state.visible = visibleIds;
+      }
+
+      function tickTimers() {
+        for (const [id, node] of nodes) {
+          const agent = state.agents.get(id);
+          if (!agent) continue;
+          const isDone = agent.status === "done";
+          const doneAge = agent.endedAt ? Date.now() - parseTime(agent.endedAt) : 0;
+          node.classList.toggle("dim", isDone && doneAge > 20000);
+          node.classList.toggle("fade", isDone && doneAge > 180000);
+          const path = paths.get(id);
+          path?.classList.toggle("dim", isDone && doneAge > 20000);
+          path?.classList.toggle("fade", isDone && doneAge > 180000);
+          const timer = node.querySelector(".timer");
+          if (timer) timer.textContent = elapsed(agent.startedAt, agent.endedAt);
+          if (!isDone) applyRunningStatus(node, agent);
+        }
+        const session = activeSession();
+        const agents = selectedAgents(session);
+        if (agents.length !== state.visible.size) renderAll();
+      }
+
+      function safeJson(event) {
+        try {
+          return JSON.parse(event.data);
+        } catch {
+          return null;
+        }
+      }
+
+      function connect() {
+        const source = new EventSource("/events");
+        source.onopen = () => setConnection(true);
+        source.onerror = () => setConnection(false);
+        source.addEventListener("snapshot", event => {
+          const msg = safeJson(event);
+          if (msg) replaceSnapshot(msg);
+        });
+        source.addEventListener("fleet", event => {
+          const msg = safeJson(event);
+          if (msg) applyFleet(msg);
+        });
+      }
+
+      els.picker.addEventListener("change", event => {
+        state.selected = event.target.value;
+        renderAll();
+      });
+      window.addEventListener("resize", () => requestAnimationFrame(renderAll));
+      setInterval(tickTimers, 1000);
+      renderBell();
+      renderAll();
+      connect();
+    })();
+  </script>
+</body>
+</html>
