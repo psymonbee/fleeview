@@ -259,15 +259,18 @@
       <table>
         <tr><th>File</th><th>Plain-English job</th></tr>
         <tr><td><span class="file">hooks/emit-event.mjs</span></td><td>The note-taker Claude Code taps on every event. Deliberately tiny and silent — it can never break your real work.</td></tr>
-        <tr><td><span class="file">adapters/claude-code.mjs</span></td><td>The translator: Claude Code's dialect in, FleetView's universal language out. One of these per AI tool, eventually.</td></tr>
+        <tr><td><span class="file">adapters/claude-code.mjs</span></td><td>The translator: Claude Code's dialect in, FleetView's universal language out. One of these per AI tool.</td></tr>
+        <tr><td><span class="file">adapters/codex.mjs</span></td><td>The second translator (new in v3): OpenAI Codex's dialect in, same universal language out. Every Codex name gets a "codex:" prefix so the two tools can never be confused on screen.</td></tr>
+        <tr><td><span class="file">server/enrich.mjs</span></td><td>The accountant (new in v3): quietly reads each agent's own session transcript on your Mac, adds up the tokens it has spent, and prices them. Nothing ever leaves your machine.</td></tr>
+        <tr><td><span class="file">bin/install.mjs</span></td><td>The mover-in (new in v3): one command sets FleetView up on any Mac — copies the app to a stable home, wires the hooks in (with a backup first), and can undo itself with --uninstall.</td></tr>
         <tr><td><span class="file">~/.lumenade/events.jsonl</span></td><td>The diary (lives in your home folder, not the repo). One line per event. The whole system's single source of truth.</td></tr>
         <tr><td><span class="file">server/server.mjs</span></td><td>The newsroom: reads the diary, keeps the current picture, broadcasts changes, and serves the web page.</td></tr>
         <tr><td><span class="file">server/narrator.mjs</span></td><td>The optional commentator. Off unless you flip it on in the config.</td></tr>
         <tr><td><span class="file">public/index.html</span></td><td>The screen — one self-contained page, no internet access needed or used.</td></tr>
-        <tr><td><span class="file">fleet.config.json</span></td><td>The settings dial: agent names and models, the hub's title, how long "silent" means stalled, narrator on/off.</td></tr>
+        <tr><td><span class="file">fleet.config.json</span></td><td>The settings dial: agent names and models, the hub's title, how long "silent" means stalled, narrator on/off — and, new in v3, the price list the accountant uses (editable when rates change).</td></tr>
         <tr><td><span class="file">scripts/demo.mjs</span></td><td>A rehearsal tape: replays a fake 60-second orchestration so you can see every feature without running real agents.</td></tr>
         <tr><td><span class="file">docs/FLEETVIEW-SPEC.md</span></td><td>The written contract. Every feature was specified here <em>before</em> being built; the builders and the checker all worked from this document.</td></tr>
-        <tr><td><span class="file">test/</span></td><td>33 automated checks, run against <em>real</em> recorded Claude Code events we captured during a probe session — not made-up samples.</td></tr>
+        <tr><td><span class="file">test/</span></td><td>106 automated checks (up from 33 in v2), run against <em>real</em> recorded Claude Code events — plus, for Codex, payload blueprints extracted from the Codex program itself, clearly labelled as such.</td></tr>
       </table>
     </div>
     <div class="callout"><strong>One clever safety rule worth knowing:</strong> the narrator uses a small Claude to describe your agents — but that Claude would itself trigger the hooks and appear on its own screen, forever. So every narrator run carries a "don't film the film crew" flag (<span class="file">FLEET_IGNORE</span>), and the note-taker steps aside when it sees it. Both sides were tested with the real Claude to prove the loop can't happen.</div>
@@ -283,19 +286,24 @@
     <p class="kbd-line">npm run demo <span class="c">(add</span> -- --fast <span class="c">to skip the waits)</span></p>
     <p style="margin-top:18px"><strong>To switch it all off:</strong> two moves, fully reversible — remove the hooks block from <span class="file">~/.claude/settings.json</span> (the taps stop), and delete the diary folder:</p>
     <p class="kbd-line">rm -rf ~/.lumenade</p>
-    <p class="muted" style="margin-top:18px">The config dial lives in <span class="file">fleet.config.json</span> — rename an agent, change what counts as "stalled", or set <span class="file">narration.enabled</span> to true to hear the commentator.</p>
+    <p class="muted" style="margin-top:18px">The config dial lives in <span class="file">fleet.config.json</span> — rename an agent, change what counts as "stalled", tweak the token price list, or set <span class="file">narration.enabled</span> to true to hear the commentator.</p>
+    <p style="margin-top:18px"><strong>To set it up on another Mac</strong> (new in v3, once the repo is public): one command does the whole move-in, and the same command with <span class="file">--uninstall</span> undoes it.</p>
+    <p class="kbd-line">npx github:psymonbee/fleeview</p>
   </section>
 
   <!-- ─────────────────────────── SLIDE 7 ─────────────────────────── -->
   <section class="slide">
     <p class="eyebrow">Slide 7 · Proof &amp; what's next</p>
-    <h2>How we know it works — and where v3 goes</h2>
-    <p><strong>The proof is unusually good:</strong> FleetView v2 was built by exactly the kind of agent fleet it visualises — and the moment its capture pipeline went live, mid-build, it started recording its own construction. By the end, the screen showed the real Builder and Checker agents as live cards, and the plan rail was tracking the actual build checklist, step by step, to ✓ done. On top of that: 33 automated tests against real recorded events, a formal 7-point acceptance sweep by an independent checker agent, and a live end-to-end test with a real Claude session.</p>
-    <p><strong>Saved for v3</strong> (agreed scope, not forgotten): a one-command installer so others can use it, a translator for OpenAI's Codex CLI so its agents appear too, token/cost figures on each card (the diary already records what's needed), and a proper public-facing README for the GitHub page.</p>
+    <h2>v3 shipped — what landed, and what's honest about it</h2>
+    <p><strong>Everything in the v3 scope landed:</strong> token counts and an estimated cost on every card (with the full in/out/cache breakdown in the drawer and a session total on the hub), the one-command installer, the Codex translator, and the public-facing README. The cost figures come from adding up each agent's own transcript on your Mac — verified to the exact token against an independent hand-count of a real session.</p>
+    <p><strong>One honest asterisk on Codex:</strong> its hook system turned out to be locked behind its plugin mechanism — installing one is a change to <em>your</em> Codex account setup, so the fleet never did it for you. Instead, the translator was built against the payload blueprints inside the Codex program itself, the installer prepares the plugin folder, and it prints the two commands for you to run if and when you want Codex agents on screen. Until then Codex support is labelled experimental.</p>
+    <p><strong>The proof:</strong> 106 automated tests all green, a full dress rehearsal through the real pipeline (demo, Codex events, and a plan step created by a subagent — the old "(untitled step)" bug is fixed), a live browser inspection of every new screen element, and the same self-filming trick as v2: this very build ran with FleetView's own capture live.</p>
+    <p><strong>Waiting on you</strong> (the two steps only you can do): flip the repo to public on GitHub, then run the installer once for real. Your v4 ideas from today — usage limits on screen, skills/servers per card, showing the "getting oriented" phase before a plan exists — are parked in the bootstrap file, not lost.</p>
     <div class="pills">
       <span class="pill"><span class="dot green"></span>v1 · built 16 July</span>
       <span class="pill"><span class="dot green"></span>v2 · built &amp; shipped 17 July</span>
-      <span class="pill"><span class="dot teal"></span>v3 · scoped, waiting on you</span>
+      <span class="pill"><span class="dot green"></span>v3 · built &amp; shipped 17 July</span>
+      <span class="pill"><span class="dot teal"></span>v4 · ideas parked</span>
     </div>
   </section>
 
