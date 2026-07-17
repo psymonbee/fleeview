@@ -9,9 +9,19 @@
   "fallbackAgent": { "model": "Claude", "provider": "anthropic" },
   "modelNames": {
     "claude-fable-5": "Claude Fable 5", "claude-opus-4-8": "Claude Opus 4.8",
-    "claude-sonnet-5": "Claude Sonnet 5", "claude-haiku-4-5": "Claude Haiku 4.5"
+    "claude-sonnet-5": "Claude Sonnet 5", "claude-haiku-4-5": "Claude Haiku 4.5",
+    "gpt-5.5": "GPT-5.5"
   },
   "stallThresholdMs": 120000,
   "narration": { "enabled": false, "model": "haiku", "debounceMs": 15000,
-                 "minNewLines": 3, "maxConcurrent": 1, "timeoutMs": 30000 }
+                 "minNewLines": 3, "maxConcurrent": 1, "timeoutMs": 30000 },
+  "enrichment": {
+    "enabled": true, "intervalMs": 5000,
+    "pricing": {
+      "claude-fable-5":  { "in": 10, "out": 50, "cacheRead": 1,   "cacheWrite": 12.5  },
+      "claude-opus-4-8": { "in": 5,  "out": 25, "cacheRead": 0.5, "cacheWrite": 6.25  },
+      "claude-sonnet-5": { "in": 3,  "out": 15, "cacheRead": 0.3, "cacheWrite": 3.75  },
+      "claude-haiku-4-5":{ "in": 1,  "out": 5,  "cacheRead": 0.1, "cacheWrite": 1.25  }
+    }
+  }
 }

@@ -63,6 +63,20 @@ const DEFAULT_CONFIG = {
     maxConcurrent: 1,
     timeoutMs: 30000,
   },
+  // Token/cost enrichment (§19.4). USD per MTok, verified against current API
+  // pricing 2026-07-17 (cache read = 0.1x input; 5-minute cache write = 1.25x
+  // input). Do not change these numbers without re-verifying against current
+  // API pricing.
+  enrichment: {
+    enabled: true,
+    intervalMs: 5000,
+    pricing: {
+      "claude-fable-5": { in: 10, out: 50, cacheRead: 1, cacheWrite: 12.5 },
+      "claude-opus-4-8": { in: 5, out: 25, cacheRead: 0.5, cacheWrite: 6.25 },
+      "claude-sonnet-5": { in: 3, out: 15, cacheRead: 0.3, cacheWrite: 3.75 },
+      "claude-haiku-4-5": { in: 1, out: 5, cacheRead: 0.1, cacheWrite: 1.25 },
+    },
+  },
 };
 
 function loadConfig() {
@@ -168,6 +182,9 @@ function getOrCreateSession(sessionId, t, cwd) {
       lastActivityAt: t,
       turnActive: false,
       ended: false,
+      transcriptPath: null,
+      tokens: null,
+      costUsd: null,
     };
     sessions.set(sessionId, session);
     broadcast({ type: "session", session });
@@ -368,13 +385,16 @@ function applyEvent(evt) {
   const nowMs = Date.parse(t) || Date.now();
 
   const session = getOrCreateSession(sessionId, t, evt.cwd);
-  session.lastActivityAt = t; // every event touches session freshness
+  // Every event touches session freshness -- except agent.usage (§19.2):
+  // token bookkeeping must never mask a stall.
+  if (kind !== "agent.usage") session.lastActivityAt = t;
 
   switch (kind) {
     case "session.start": {
       session.cwd = evt.cwd ?? session.cwd;
       session.turnActive = false;
       session.ended = false;
+      session.transcriptPath = evt.transcriptPath ?? session.transcriptPath;
       broadcast({ type: "session", session });
       break;
     }
@@ -482,6 +502,9 @@ function applyEvent(evt) {
           finalMessage: null,
           narrative: null,
           narrativeAt: null,
+          transcriptPath: null,
+          tokens: null,
+          costUsd: null,
         };
       } else {
         agent.agentType = agentType;
@@ -593,6 +616,7 @@ function applyEvent(evt) {
       agent.endedAt = t;
       agent.currentActivity = null;
       if (evt.finalMessage !== undefined) agent.finalMessage = evt.finalMessage;
+      if (evt.transcriptPath !== undefined) agent.transcriptPath = evt.transcriptPath;
 
       // Any still-open calls are unresolved -> mark errored (no lastErrorAt
       // bump — the card is done; the drawer shows the red line).
@@ -605,6 +629,29 @@ function applyEvent(evt) {
       }
 
       broadcast({ type: "agent", agent });
+      break;
+    }
+
+    // Token/cost enrichment (§19.2). agentId: null applies to the Session,
+    // else to that AgentRun (upsert semantics). Unknown agentId -> skip
+    // silently (the run may already have been pruned). Deliberately does
+    // NOT touch lastActivityAt at either level -- see the conditional bump
+    // above; token bookkeeping must never mask a stall.
+    case "agent.usage": {
+      const tokens = evt.tokens ?? null;
+      const costUsd = evt.costUsd !== undefined ? evt.costUsd : null;
+
+      if (evt.agentId == null) {
+        session.tokens = tokens;
+        session.costUsd = costUsd;
+        broadcast({ type: "session", session });
+      } else {
+        const agent = agents.get(evt.agentId);
+        if (!agent) break; // unknown agent -- skip silently
+        agent.tokens = tokens;
+        agent.costUsd = costUsd;
+        broadcast({ type: "agent", agent });
+      }
       break;
     }
 
@@ -666,6 +713,7 @@ function pruneOldRecords(nowMs) {
         agentLogs.delete(id);
         openCalls.delete(id);
         exactPending.delete(id);
+        if (enricher) enricher.forget(enrichmentKey("agent", id));
       }
     }
   }
@@ -673,12 +721,14 @@ function pruneOldRecords(nowMs) {
     const age = nowMs - (Date.parse(session.lastActivityAt) || nowMs);
     if (Number.isFinite(age) && age > SESSION_MAX_AGE_MS) {
       sessions.delete(id);
+      if (enricher) enricher.forget(enrichmentKey("session", id));
       for (const [agentId, agent] of agents) {
         if (agent.sessionId === id) {
           agents.delete(agentId);
           agentLogs.delete(agentId);
           openCalls.delete(agentId);
           exactPending.delete(agentId);
+          if (enricher) enricher.forget(enrichmentKey("agent", agentId));
         }
       }
       for (const [pendingId, pending] of exactPending) {
@@ -717,6 +767,108 @@ if (config.narration && config.narration.enabled) {
 }
 if (narrator) {
   setInterval(() => narrator.tick(), 5000);
+}
+
+// ---------------------------------------------------------------------------
+// Enricher integration (server/enrich.mjs, §19.3). Guarded behind
+// config.enrichment.enabled; zero behavior change while disabled. Reads
+// transcript files directly and writes token/cost state back via onUsage —
+// never appends to the events file, never bumps lastActivityAt.
+// ---------------------------------------------------------------------------
+
+import { createEnricher } from "./enrich.mjs";
+
+// Shared key format between getTargets/onUsage/forget below -- distinct
+// prefixes so a session key can never collide with an agent id (codex-direct
+// agent ids already contain ":", so a bare id would not be safely parseable).
+function enrichmentKey(scope, id) {
+  return `${scope}:${id}`;
+}
+
+// dirname(session.transcriptPath)/<sessionId>/subagents/agent-<agentId>.jsonl
+// -- convention verified on disk 2026-07-17.
+function deriveAgentTranscriptPath(session, agentId) {
+  if (!session || !session.transcriptPath) return null;
+  return path.join(
+    path.dirname(session.transcriptPath),
+    session.id,
+    "subagents",
+    `agent-${agentId}.jsonl`
+  );
+}
+
+const AGENT_ENRICH_SWEEP_MS = 60 * 1000; // final sweep window after agent.end
+const SESSION_ENRICH_ACTIVE_MS = 10 * 60 * 1000; // main transcript activity window
+
+// Enumerates enrichment targets fresh each tick (§19.3): running agents plus
+// agents that ended <60s ago (final sweep), each with a resolvable transcript
+// path gated on existsSync (which naturally excludes demo/codex agents that
+// never wrote a real transcript); sessions with a transcriptPath active <10min
+// ago (main transcript -> session/hub tokens).
+function getEnrichmentTargets() {
+  const nowMs = Date.now();
+  const targets = [];
+
+  for (const agent of agents.values()) {
+    const recentlyEnded =
+      agent.status === "done" &&
+      agent.endedAt &&
+      nowMs - (Date.parse(agent.endedAt) || nowMs) < AGENT_ENRICH_SWEEP_MS;
+    if (agent.status !== "running" && !recentlyEnded) continue;
+
+    const filePath =
+      agent.transcriptPath || deriveAgentTranscriptPath(sessions.get(agent.sessionId), agent.id);
+    if (!filePath || !existsSync(filePath)) continue;
+
+    targets.push({ key: enrichmentKey("agent", agent.id), path: filePath });
+  }
+
+  for (const session of sessions.values()) {
+    if (!session.transcriptPath) continue;
+    const age = nowMs - (Date.parse(session.lastActivityAt) || nowMs);
+    if (!Number.isFinite(age) || age >= SESSION_ENRICH_ACTIVE_MS) continue;
+    if (!existsSync(session.transcriptPath)) continue;
+
+    targets.push({ key: enrichmentKey("session", session.id), path: session.transcriptPath });
+  }
+
+  return targets;
+}
+
+// Sets fields + broadcasts -- deliberately never touches lastActivityAt
+// (§19.2's no-bump rule applies identically to the enricher's writes).
+function onEnrichmentUsage(key, tokens, costUsd) {
+  const sep = key.indexOf(":");
+  if (sep === -1) return;
+  const scope = key.slice(0, sep);
+  const id = key.slice(sep + 1);
+
+  if (scope === "session") {
+    const session = sessions.get(id);
+    if (!session) return;
+    session.tokens = tokens;
+    session.costUsd = costUsd;
+    broadcast({ type: "session", session });
+  } else if (scope === "agent") {
+    const agent = agents.get(id);
+    if (!agent) return;
+    agent.tokens = tokens;
+    agent.costUsd = costUsd;
+    broadcast({ type: "agent", agent });
+  }
+}
+
+let enricher = null;
+if (config.enrichment && config.enrichment.enabled) {
+  enricher = createEnricher({
+    config,
+    getTargets: getEnrichmentTargets,
+    onUsage: onEnrichmentUsage,
+  });
+}
+if (enricher) {
+  const intervalMs = (config.enrichment && config.enrichment.intervalMs) || 5000;
+  setInterval(() => enricher.tick(), intervalMs);
 }
 
 // ---------------------------------------------------------------------------
