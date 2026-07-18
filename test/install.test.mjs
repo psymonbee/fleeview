@@ -289,7 +289,7 @@ describe("bin/install.mjs — --dev", () => {
   });
 });
 
-describe("bin/install.mjs — --with-codex (§18.4)", () => {
+describe("bin/install.mjs — --with-codex (§18.4/§18.5)", () => {
   const CODEX_EVENTS = [
     "PreToolUse",
     "PermissionRequest",
@@ -303,39 +303,81 @@ describe("bin/install.mjs — --with-codex (§18.4)", () => {
     "Stop",
   ];
 
-  test("scaffolds the plugin package and prints registration steps; never touches ~/.codex", () => {
+  test("scaffolds a registerable marketplace + plugin and prints registration steps; never touches ~/.codex", () => {
     const home = makeScratchHome();
     try {
       const result = runInstaller(home, ["--yes", "--with-codex"]);
       assert.equal(result.status, 0, `stderr: ${result.stderr}`);
 
-      const pluginDir = join(home, ".lumenade", "app", "codex-plugin");
+      const marketplaceRoot = join(home, ".lumenade", "app", "codex-plugin");
+
+      // marketplace manifest lists the plugin (§18.4) — this is what
+      // `codex plugin marketplace add` consumes.
+      const marketplace = JSON.parse(
+        readFileSync(join(marketplaceRoot, ".agents", "plugins", "marketplace.json"), "utf8")
+      );
+      assert.equal(marketplace.name, "fleetview");
+      assert.equal(marketplace.plugins.length, 1);
+      const [entry] = marketplace.plugins;
+      assert.equal(entry.name, "fleetview");
+      assert.equal(entry.source.source, "local");
+      assert.equal(entry.source.path, "./plugins/fleetview");
+      assert.equal(entry.policy.installation, "AVAILABLE");
+      assert.ok(entry.category, "marketplace entry declares a category");
+
+      // plugin manifest is validation-ready and declares NO hooks field.
+      const pluginRoot = join(marketplaceRoot, "plugins", "fleetview");
       const manifest = JSON.parse(
-        readFileSync(join(pluginDir, ".codex-plugin", "plugin.json"), "utf8")
+        readFileSync(join(pluginRoot, ".codex-plugin", "plugin.json"), "utf8")
       );
       assert.equal(manifest.name, "fleetview");
+      assert.match(manifest.version, /^\d+\.\d+\.\d+$/, "strict semver version");
+      assert.equal(manifest.author.name, "FleetView");
+      for (const field of [
+        "displayName",
+        "shortDescription",
+        "longDescription",
+        "developerName",
+        "category",
+        "capabilities",
+        "defaultPrompt",
+      ]) {
+        assert.ok(field in manifest.interface, `interface.${field} present`);
+      }
+      assert.ok(
+        !("hooks" in manifest),
+        "plugin.json must not declare a hooks field (Codex ingestion rejects it)"
+      );
 
-      const { hooks } = JSON.parse(readFileSync(join(pluginDir, "hooks.json"), "utf8"));
+      // hooks.json lives at the plugin root, discovered by convention.
+      const { hooks } = JSON.parse(readFileSync(join(pluginRoot, "hooks.json"), "utf8"));
       assert.deepEqual(Object.keys(hooks).sort(), [...CODEX_EVENTS].sort());
       for (const eventName of CODEX_EVENTS) {
-        const [entry] = hooks[eventName];
+        const [hookEntry] = hooks[eventName];
         const isToolEvent = eventName === "PreToolUse" || eventName === "PostToolUse";
-        assert.equal(entry.matcher, isToolEvent ? "*" : undefined, `${eventName} matcher`);
+        assert.equal(hookEntry.matcher, isToolEvent ? "*" : undefined, `${eventName} matcher`);
         assert.ok(
-          entry.hooks[0].command.endsWith("emit-event.mjs codex"),
+          hookEntry.hooks[0].command.endsWith("emit-event.mjs codex"),
           `${eventName} command uses the codex adapter arg`
         );
         assert.ok(
-          entry.hooks[0].command.startsWith("/"),
+          hookEntry.hooks[0].command.startsWith("/"),
           `${eventName} names an absolute interpreter, never a bare node (§17.4)`
         );
         assert.ok(
-          entry.hooks[0].command.includes(join(home, ".lumenade", "app")),
+          hookEntry.hooks[0].command.includes(join(home, ".lumenade", "app")),
           `${eventName} command points at the vendored app`
         );
       }
 
-      assert.ok(result.stdout.includes("codex plugin marketplace add"), "prints registration");
+      assert.ok(
+        result.stdout.includes(`codex plugin marketplace add ${marketplaceRoot}`),
+        "prints marketplace registration"
+      );
+      assert.ok(
+        result.stdout.includes("codex plugin add fleetview@fleetview"),
+        "prints plugin install with the marketplace selector"
+      );
       assert.ok(result.stdout.includes("codex-notify"), "prints notify alternative");
       assert.ok(!existsSync(join(home, ".codex")), "nothing created under ~/.codex");
     } finally {
@@ -343,15 +385,22 @@ describe("bin/install.mjs — --with-codex (§18.4)", () => {
     }
   });
 
-  test("--dev --with-codex scaffolds under ~/.lumenade/codex-plugin pointing at the checkout", () => {
+  test("--dev --with-codex scaffolds the marketplace under ~/.lumenade/codex-plugin pointing at the checkout", () => {
     const home = makeScratchHome();
     try {
       const devPath = join(home, "dev-checkout");
       const result = runInstaller(home, ["--yes", "--dev", devPath, "--with-codex"]);
       assert.equal(result.status, 0, `stderr: ${result.stderr}`);
 
-      const pluginDir = join(home, ".lumenade", "codex-plugin");
-      const { hooks } = JSON.parse(readFileSync(join(pluginDir, "hooks.json"), "utf8"));
+      const marketplaceRoot = join(home, ".lumenade", "codex-plugin");
+      const marketplace = JSON.parse(
+        readFileSync(join(marketplaceRoot, ".agents", "plugins", "marketplace.json"), "utf8")
+      );
+      assert.equal(marketplace.plugins[0].source.path, "./plugins/fleetview");
+
+      const { hooks } = JSON.parse(
+        readFileSync(join(marketplaceRoot, "plugins", "fleetview", "hooks.json"), "utf8")
+      );
       const [entry] = hooks.SessionStart;
       assert.equal(
         entry.hooks[0].command,

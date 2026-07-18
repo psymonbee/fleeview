@@ -827,18 +827,56 @@ string — S2-verified; notify never uses stdin). Unknown arg → silent exit
 0. FLEET_IGNORE guard unchanged and checked first. The rewrite of this
 LIVE file is a single atomic Write followed immediately by `node --check`.
 
-**Wiring reality (per §18.1):** hooks require an installed Codex plugin.
-The installer's `--with-codex` therefore (a) scaffolds a plugin package at
-`<app>/codex-plugin/` — `.codex-plugin/plugin.json` manifest +
-`hooks.json` wiring the 10 events to `<abs-node>
-<app>/hooks/emit-event.mjs codex` (absolute interpreter, §17.4) — and (b)
-**prints** the registration instructions
-(`codex plugin marketplace add` / `codex plugin add`) plus the no-plugin
-alternative: add
+**Wiring reality (per §18.1; corrected 2026-07-18 after the first live
+registration on Codex CLI 0.144.5 — see §18.5):** `codex plugin marketplace
+add <dir>` requires `<dir>` to be a **marketplace root** (a directory whose
+`.agents/plugins/marketplace.json` *lists* plugins), not a bare plugin. The
+installer's `--with-codex` therefore scaffolds a marketplace at
+`<app>/codex-plugin/`:
+
+- `.agents/plugins/marketplace.json` — `{name: "fleetview", interface:
+  {displayName}, plugins: [{name: "fleetview", source: {source: "local",
+  path: "./plugins/fleetview"}, policy: {installation: "AVAILABLE",
+  authentication: "ON_INSTALL"}, category}]}`.
+- `plugins/fleetview/.codex-plugin/plugin.json` — the plugin manifest in
+  Codex's validation-ready shape: `name`, strict-semver `version`,
+  `description`, `author.name`, and `interface {displayName,
+  shortDescription, longDescription, developerName, category, capabilities,
+  defaultPrompt}`. **No `hooks` field** — Codex ingestion rejects it as an
+  unsupported manifest field.
+- `plugins/fleetview/hooks.json` — wires the 10 events to
+  `<abs-node> <app>/hooks/emit-event.mjs codex` (absolute interpreter,
+  §17.4); format unchanged
+  (`{hooks: {Event: [{matcher?, hooks: [{type: "command", command}]}]}}`,
+  identical to shipping OpenAI plugins figma/replayio) and auto-discovered
+  by convention (not referenced from the manifest).
+
+It then **prints** the registration commands (`codex plugin marketplace add
+<app>/codex-plugin` / `codex plugin add fleetview@fleetview`) plus the
+no-plugin alternative: add
 `notify = ["<abs-node>", "<app>/hooks/emit-event.mjs", "codex-notify"]` to
 `~/.codex/config.toml` for turn-boundary capture only. The installer never
 runs `codex` commands and never edits `~/.codex/*` — registration is
 explicitly the user's action (persistent, account-linked).
+
+### 18.5 Live registration (2026-07-18, Codex CLI 0.144.5)
+
+First real `--with-codex` run on a fresh machine surfaced that the v4
+scaffold — a bare `<app>/codex-plugin/` holding `.codex-plugin/plugin.json`
++ `hooks.json` — is rejected by `codex plugin marketplace add` with
+"marketplace root does not contain a supported manifest". 0.144.5 separates
+**marketplace** (a manifest listing plugins) from **plugin**; `marketplace
+add` takes the former, `plugin add <name>@<marketplace>` installs the
+latter. Fix: the §18.4 marketplace wrapper above. Authoritative schema lives
+on-disk in Codex's own `plugin-creator` skill
+(`~/.codex/skills/.system/plugin-creator/references/plugin-json-spec.md` +
+`scripts/create_basic_plugin.py`) and in shipping marketplaces
+(`~/.codex/.tmp/**/.agents/plugins/marketplace.json`). **Verified** via an
+isolated-`CODEX_HOME` probe: `marketplace add` → `plugin add
+fleetview@fleetview` → `plugin list` reports `installed, enabled`, with
+`hooks.json` bundled into the plugin cache. Still open (unchanged
+experimental status): live hook *firing* during a Codex session — validated
+only when a real `codex` run paints Codex cards on the canvas.
 
 ## 19. Token/cost enrichment
 
