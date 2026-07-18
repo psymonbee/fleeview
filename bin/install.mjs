@@ -125,8 +125,17 @@ function entryHasFleetviewHook(entry) {
   );
 }
 
+// Hook commands must name the interpreter by ABSOLUTE path (spec §17.4).
+// Hooks are spawned by whatever launched the harness, and a GUI-launched
+// Claude.app inherits the macOS default PATH (/usr/bin:/bin:/usr/sbin:/sbin) —
+// which contains no nvm/fnm/volta node. A bare `node` there dies with "command
+// not found", silently (a failing hook neither blocks the harness nor surfaces
+// an error), so the events file is never created and the canvas stays empty.
+// process.execPath is the node running this installer, so it always resolves.
+const NODE_BIN = process.execPath;
+
 function buildFleetviewEntry(eventName, hookScriptPath) {
-  const hookDef = { type: "command", command: `node ${hookScriptPath}`, timeout: 5 };
+  const hookDef = { type: "command", command: `${NODE_BIN} ${hookScriptPath}`, timeout: 5 };
   return TOOL_EVENTS.has(eventName) ? { matcher: ".*", hooks: [hookDef] } : { hooks: [hookDef] };
 }
 
@@ -188,7 +197,7 @@ function scaffoldCodexPlugin(pluginDir, hookScriptPath) {
 
   const hooks = {};
   for (const eventName of CODEX_EVENTS) {
-    const hookDef = { type: "command", command: `node ${hookScriptPath} codex` };
+    const hookDef = { type: "command", command: `${NODE_BIN} ${hookScriptPath} codex` };
     hooks[eventName] = [
       CODEX_TOOL_EVENTS.has(eventName)
         ? { matcher: "*", hooks: [hookDef] }
@@ -203,7 +212,7 @@ function scaffoldCodexPlugin(pluginDir, hookScriptPath) {
   console.log(`  codex plugin marketplace add ${pluginDir}`);
   console.log("  codex plugin add fleetview");
   console.log("No-plugin alternative (turn boundaries only): add to ~/.codex/config.toml:");
-  console.log(`  notify = ["node", "${hookScriptPath}", "codex-notify"]`);
+  console.log(`  notify = ["${NODE_BIN}", "${hookScriptPath}", "codex-notify"]`);
 }
 
 // Starter agents (spec §23): copy the three genericized agent definitions into

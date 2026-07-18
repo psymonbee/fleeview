@@ -105,6 +105,10 @@ describe("bin/install.mjs — fresh install", () => {
       assert.equal(entry.hooks[0].type, "command");
       assert.equal(entry.hooks[0].timeout, 5);
       assert.ok(entry.hooks[0].command.includes("/hooks/emit-event.mjs"));
+      assert.ok(
+        entry.hooks[0].command.startsWith("/"),
+        `${eventName} names an absolute interpreter, never a bare node (§17.4)`
+      );
     }
   });
 
@@ -267,7 +271,10 @@ describe("bin/install.mjs — --dev", () => {
 
       const settings = readSettings(home);
       const [entry] = settings.hooks.SessionStart;
-      assert.equal(entry.hooks[0].command, `node ${join(devPath, "hooks", "emit-event.mjs")}`);
+      assert.equal(
+        entry.hooks[0].command,
+        `${process.execPath} ${join(devPath, "hooks", "emit-event.mjs")}`
+      );
 
       assert.ok(!existsSync(join(home, ".lumenade", "app")), "no vendored copy created");
     } finally {
@@ -313,6 +320,10 @@ describe("bin/install.mjs — --with-codex (§18.4)", () => {
           `${eventName} command uses the codex adapter arg`
         );
         assert.ok(
+          entry.hooks[0].command.startsWith("/"),
+          `${eventName} names an absolute interpreter, never a bare node (§17.4)`
+        );
+        assert.ok(
           entry.hooks[0].command.includes(join(home, ".lumenade", "app")),
           `${eventName} command points at the vendored app`
         );
@@ -338,7 +349,7 @@ describe("bin/install.mjs — --with-codex (§18.4)", () => {
       const [entry] = hooks.SessionStart;
       assert.equal(
         entry.hooks[0].command,
-        `node ${join(devPath, "hooks", "emit-event.mjs")} codex`
+        `${process.execPath} ${join(devPath, "hooks", "emit-event.mjs")} codex`
       );
       assert.ok(!existsSync(join(home, ".lumenade", "app")), "still no vendored copy");
     } finally {
