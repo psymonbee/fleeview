@@ -744,12 +744,16 @@ committed, sanitized of anything secret-like.
 **S2 findings (probe run 2026-07-17, Codex CLI 0.144.5 — full notes in
 `test/fixtures/codex/PROBE-NOTES.md`):**
 
-- **Hooks are plugin-gated.** `codex exec` fired zero hooks across four
-  project-local hooks.json wirings (with `--dangerously-bypass-hook-trust`).
-  Working hooks.json files exist only inside installed-plugin packages;
-  registration (`codex plugin add`) is a persistent, account-linked change —
-  a USER action, never an agent's. Consequence: **no runtime hook payloads
-  were captured; none are faked.**
+- **Hooks are plugin-gated.** *(SUPERSEDED 2026-07-19: wrong — this probe
+  never tried the user-level `~/.codex/config.toml` struct shape, the one
+  location Codex actually loads hooks from; see §18.5–§18.6.)* `codex exec`
+  fired zero hooks across four project-local hooks.json wirings (with
+  `--dangerously-bypass-hook-trust`). Working hooks.json files exist only
+  inside installed-plugin packages; registration (`codex plugin add`) is a
+  persistent, account-linked change — a USER action, never an agent's.
+  Consequence at the time: no runtime hook payloads were captured. *(Real
+  payloads for 5 of the 10 events were captured live on 2026-07-19 —
+  §18.5.)*
 - **The binary embeds draft-07 JSON Schemas for all hook payloads** —
   extracted verbatim to `test/fixtures/codex/schemas/*.json`. Authoritative
   for field names/types/required lists (not example values). The real event
@@ -780,6 +784,9 @@ contract), so the adapter is built against them with fixtures labelled
 `-SYNTHETIC` (schema-exact shapes, fabricated values — same convention as
 v2's `pre-exitplanmode-SYNTHETIC.json`). Live hook validation is deferred
 until the USER wires the plugin; Codex support ships as **experimental**.
+*(2026-07-19: live validation has since passed via user-level config
+delivery — §18.5. Fixtures for events that fired are promoted to real
+captures; the rest stay `-SYNTHETIC`.)*
 
 ### 18.2 `adapters/codex.mjs`
 
@@ -827,56 +834,90 @@ string — S2-verified; notify never uses stdin). Unknown arg → silent exit
 0. FLEET_IGNORE guard unchanged and checked first. The rewrite of this
 LIVE file is a single atomic Write followed immediately by `node --check`.
 
-**Wiring reality (per §18.1; corrected 2026-07-18 after the first live
-registration on Codex CLI 0.144.5 — see §18.5):** `codex plugin marketplace
-add <dir>` requires `<dir>` to be a **marketplace root** (a directory whose
-`.agents/plugins/marketplace.json` *lists* plugins), not a bare plugin. The
-installer's `--with-codex` therefore scaffolds a marketplace at
-`<app>/codex-plugin/`:
+**Delivery (rewritten 2026-07-19; supersedes the plugin scaffold — see
+§18.6 for why):** Codex loads hooks from the **user-level**
+`~/.codex/config.toml` only (a project-level `.codex/config.toml` is never
+read). One array-of-tables entry per event, **no `matcher`** — omitting it
+fires for every tool, which is what FleetView wants, and it is the exact
+shape proven live (§18.5). Verified matcher semantics, should a future need
+arise: `"*"` matches all tools, exact Claude-style names (`"Bash"`) match
+that tool, `"shell"` matches nothing — Codex tool names are
+Claude-compatible, per the §18.1 schema finding.
 
-- `.agents/plugins/marketplace.json` — `{name: "fleetview", interface:
-  {displayName}, plugins: [{name: "fleetview", source: {source: "local",
-  path: "./plugins/fleetview"}, policy: {installation: "AVAILABLE",
-  authentication: "ON_INSTALL"}, category}]}`.
-- `plugins/fleetview/.codex-plugin/plugin.json` — the plugin manifest in
-  Codex's validation-ready shape: `name`, strict-semver `version`,
-  `description`, `author.name`, and `interface {displayName,
-  shortDescription, longDescription, developerName, category, capabilities,
-  defaultPrompt}`. **No `hooks` field** — Codex ingestion rejects it as an
-  unsupported manifest field.
-- `plugins/fleetview/hooks.json` — wires the 10 events to
-  `<abs-node> <app>/hooks/emit-event.mjs codex` (absolute interpreter,
-  §17.4); format unchanged
-  (`{hooks: {Event: [{matcher?, hooks: [{type: "command", command}]}]}}`,
-  identical to shipping OpenAI plugins figma/replayio) and auto-discovered
-  by convention (not referenced from the manifest).
+```toml
+[[hooks.PreToolUse]]
+[[hooks.PreToolUse.hooks]]
+type = "command"
+command = "<abs-node> <app>/hooks/emit-event.mjs codex"
+```
 
-It then **prints** the registration commands (`codex plugin marketplace add
-<app>/codex-plugin` / `codex plugin add fleetview@fleetview`) plus the
-no-plugin alternative: add
-`notify = ["<abs-node>", "<app>/hooks/emit-event.mjs", "codex-notify"]` to
-`~/.codex/config.toml` for turn-boundary capture only. The installer never
-runs `codex` commands and never edits `~/.codex/*` — registration is
-explicitly the user's action (persistent, account-linked).
+The installer's `--with-codex` **prints** this block for all 10 §18.1
+events (absolute interpreter per §17.4, non-negotiable) plus paste
+instructions. The installer never runs `codex` commands and never edits
+`~/.codex/*` — unchanged promise; the user's config may carry unrelated
+keys (`[plugins.*]`, `[features]`, a claimed `notify`) that merge logic
+would put at risk.
 
-### 18.5 Live registration (2026-07-18, Codex CLI 0.144.5)
+**The trust contract (load-bearing, must be in the printed instructions):**
+on next interactive `codex` run, Codex prompts once to trust the hook
+config; approval persists and applies to headless `codex exec` (§18.5).
+Trust is keyed to a **hash of the hook config**, so any later change to the
+block — including an installer re-run that regenerates it — **silently
+disables capture until re-approved**: no warning, no error, no events. Same
+silent-failure class as §17.4. FleetView never recommends
+`--dangerously-bypass-hook-trust` (probe tooling only).
 
-First real `--with-codex` run on a fresh machine surfaced that the v4
-scaffold — a bare `<app>/codex-plugin/` holding `.codex-plugin/plugin.json`
-+ `hooks.json` — is rejected by `codex plugin marketplace add` with
-"marketplace root does not contain a supported manifest". 0.144.5 separates
-**marketplace** (a manifest listing plugins) from **plugin**; `marketplace
-add` takes the former, `plugin add <name>@<marketplace>` installs the
-latter. Fix: the §18.4 marketplace wrapper above. Authoritative schema lives
-on-disk in Codex's own `plugin-creator` skill
-(`~/.codex/skills/.system/plugin-creator/references/plugin-json-spec.md` +
-`scripts/create_basic_plugin.py`) and in shipping marketplaces
-(`~/.codex/.tmp/**/.agents/plugins/marketplace.json`). **Verified** via an
-isolated-`CODEX_HOME` probe: `marketplace add` → `plugin add
-fleetview@fleetview` → `plugin list` reports `installed, enabled`, with
-`hooks.json` bundled into the plugin cache. Still open (unchanged
-experimental status): live hook *firing* during a Codex session — validated
-only when a real `codex` run paints Codex cards on the canvas.
+The no-plugin `notify` alternative remains valid for turn-boundary-only
+capture (`notify = ["<abs-node>", "<app>/hooks/emit-event.mjs",
+"codex-notify"]`) but is **not universal**: `notify` is a single-valued
+top-level key and may already be claimed (e.g. by Codex Computer Use).
+Document as situational, never as the default.
+
+### 18.5 Live delivery proof — user-level config hooks (2026-07-19, Codex CLI 0.144.5)
+
+Two probes on a real authenticated Codex (the `binface` fresh-machine
+account), full narrative in `docs/CODEX-HOOKS-BOOTSTRAP.md`:
+
+- **Trust persists.** `[hooks.*]` block appended to `~/.codex/config.toml`
+  → one interactive approval → headless `codex exec` with **no** bypass
+  flag captured `session.start` (with `cwd` + `transcriptPath`),
+  `turn.start`, `turn.end`, correctly `codex:`-namespaced,
+  `adapters/codex.mjs` unchanged.
+- **Tool events fire, matcher-less.** A tool-forcing prompt on the same
+  trusted config produced `session.activity {tool: "Bash", hint: "echo
+  probe"}` (§25 main-loop mapping) end to end, no bypass flag.
+- **Real payloads captured** for SessionStart, UserPromptSubmit,
+  PreToolUse, PostToolUse, Stop — field-for-field matches of the §18.1
+  binary schemas. Corrected example values: `tool_name` is `"Bash"` (not
+  `"shell"`), `tool_use_id` is `exec-<uuid>` (not `call_N`), Bash
+  `tool_response` is the plain stdout string. Still `-SYNTHETIC` (never
+  fired in any probe): SubagentStart/Stop, Pre/PostCompact,
+  PermissionRequest.
+- **Trust survives a byte-identical config round-trip** (probe swapped the
+  config for raw-capture dumpers, restored it, and captured again with no
+  bypass flag and no re-approval).
+
+### 18.6 Why not the plugin (history — do not re-attempt)
+
+1. v3/v4 delivered hooks via an installed Codex plugin, resting on the S2
+   inference "hooks are plugin-gated" (§18.1). That inference came from a
+   probe that tried four `hooks.json` locations plus a project-level
+   `.codex/config.toml` — which Codex never loads — and never the
+   user-level config with the struct shape.
+2. Codex 0.144.5 **removed** plugin hooks: `codex features list` →
+   `plugin_hooks removed false`; `--enable plugin_hooks` cannot revive a
+   removed feature.
+3. The full plugin path (marketplace root wrapper, validation-ready
+   manifest with no `hooks` field, sibling auto-discovered `hooks.json` —
+   byte-comparable to shipping OpenAI plugins) installs, validates, and
+   reports `installed, enabled` — **and is never invoked**. A plugin
+   reporting `installed, enabled` proves nothing. Codex capture had
+   therefore never worked in any FleetView version.
+4. Consequence: the installer's plugin/marketplace scaffold is dead code
+   and is removed; `--with-codex` keeps its name but prints the §18.4
+   config block instead. The marketplace schema knowledge (manifest shapes,
+   `plugin add <name>@<marketplace>` grammar) is preserved only here, as
+   history.
 
 ## 19. Token/cost enrichment
 
@@ -999,10 +1040,13 @@ symptom if §19.2's no-bump rule breaks).
    fixture through `node hooks/emit-event.mjs codex|codex-notify` yields
    `source:"codex"` events with `codex:`-prefixed ids that a 48xx test
    server reduces and renders without colliding with a claude-code
-   session's ids; **(b) deferred (USER-wired plugin) —** a real
-   `codex exec` run under the registered plugin produces live events that
-   render in the UI. (b) is not a v3 ship-blocker; Codex support is
-   labelled experimental until it passes.
+   session's ids; **(b) deferred (USER-pasted §18.4 config block) —** hook
+   trust granted and firing verified: a real `codex exec` with **no**
+   bypass flag produces live events that render in the UI. (b) is not a v3
+   ship-blocker; Codex support is labelled experimental until it passes.
+   *(2026-07-19: capture verified live through the reducer — §18.5; (b)
+   closes fully when Codex cards render on a canvas, task 4 of the §18
+   rewrite.)*
 8. Installer vs scratch HOME: fresh install writes 8 entries with `".*"`
    matchers and a populated app dir whose copied hook passes `node
    --check`; merge preserves sentinel keys + foreign hooks; re-run is
