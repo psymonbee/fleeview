@@ -1251,3 +1251,27 @@ probe.
 9. Live: a real session shows pre-plan hub activity before the first
    spawn, discovered styling on a custom agent, and a nested spawn
    drawing a parent-sourced edge while the child runs (Pre-side link).
+
+## 30. Non-coding starter agents (amends §23)
+
+`starter-agents/` gains `researcher.md` (model alias `sonnet`) and
+`writer.md` (model alias `opus`) — a research/writing pair demonstrating
+that agent fleets, and therefore FleetView, are not coding-specific.
+Same frontmatter contract as §23 (`name`, `description`, `model` in
+alias form); the researcher's description tells the orchestrator to
+spawn one per focused question (parallel fan-out is the FleetView demo
+value), the writer's states it synthesizes supplied material and never
+investigates.
+
+Installer mechanics are §23's, unchanged in kind: `STARTER_AGENTS` in
+`bin/install.mjs` (and the test suite's mirror copy) now iterates five
+files, with the same per-file never-overwrite guard, the same
+`written`/`skipped (exists)` lines, the same `--uninstall` leave-in-place
+listing, and the usage text updated to name all five. `starter-agents/`
+was already a directory entry in `VENDOR_WHITELIST`, so vendoring picks
+the new files up with no installer change.
+
+No schema, SSE, or UI change: discovery (§22) styles the new agent
+types with zero configuration — which is the point being demonstrated.
+§29.4's "writes 3 files" is historical v4 record and stands; the
+current acceptance count is five.

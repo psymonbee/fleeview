@@ -70,11 +70,16 @@ installed), `--uninstall` (below).
 
 If you don't have agent definitions of your own, `--with-agents` installs a
 starter fleet into `~/.claude/agents`: **builder** (implements a
-well-specified step), **checker** (verifies the builder's work), and
+well-specified step), **checker** (verifies the builder's work),
 **codex-runner** (relays a task to the OpenAI Codex CLI — harmless if you
-don't have `codex` installed; it simply never gets spawned). Files you
-already have are never overwritten (`skipped (exists)` is printed), and
-`--uninstall` leaves them in place — once written, they're yours.
+don't have `codex` installed; it simply never gets spawned),
+**researcher** (investigates one focused question with cited findings —
+spawn several in parallel to cover a topic), and **writer** (turns raw
+material into a polished deliverable). The last two are deliberately not
+coding agents: fleets get used for research, analysis, and writing too,
+and FleetView renders those exactly the same way. Files you already have
+are never overwritten (`skipped (exists)` is printed), and `--uninstall`
+leaves them in place — once written, they're yours.
 
 ## Architecture
 
