@@ -37,14 +37,36 @@ scripts/demo.mjs          pre-plan activity, nested demo-n1 under demo-b1,
 Spec §22–§29 is the v4 contract; **amend the spec before changing any
 schema/SSE/UI shape** — unchanged rule. `npm test` = bare `node --test`.
 
+## Two scoped workstreams — START HERE (added 2026-07-19)
+
+Both have their own bootstrap with the probe work already done. Read the one
+you are picking up **instead of** re-deriving from this file:
+
+1. **`docs/CODEX-HOOKS-BOOTSTRAP.md`** — §18 rewrite. Codex 0.144.5 **removed
+   plugin hooks** (`codex features list` → `plugin_hooks removed false`), so
+   §18's whole delivery mechanism is dead and Codex capture has never worked
+   in any version. The replacement — hooks in the **user-level**
+   `~/.codex/config.toml` — is proven end to end on a real authenticated
+   Codex, with `adapters/codex.mjs` unchanged. Largest, best-understood piece
+   of work available.
+2. **`docs/HUB-MODEL-BOOTSTRAP.md`** — the hub renders a static config string
+   and never the live orchestrator model, so the UI cannot answer "which model
+   is orchestrating?". Small, additive, probe already cleared.
+
 ## USER steps still pending (only Simon can do these)
 
-1. Codex plugin registration (unchanged from v3): run the two
-   `codex plugin` commands `--with-codex` prints. §21.7(b) live validation
-   happens then; Codex capture stays "experimental" until it passes.
-2. After the v4 push lands on GitHub, a fresh `npx github:psymonbee/fleeview
-   --with-agents` on another machine is the true end-to-end (a sandboxed-HOME
-   run of the local installer passed 2026-07-17).
+1. **Re-run the installer on Simon's own machine.** His live hooks still read
+   bare `node` (installed before §17.4); it works only because he launches
+   from an nvm-loaded shell. Proven fixed on a clean account, not on his.
+2. **Close the tool-event gap** (see the Codex bootstrap): one Codex run in
+   `binface` with a prompt that forces a tool call, to verify
+   `PreToolUse`/`PostToolUse` payloads and settle the `matcher` question.
+   Do it early — it can still change the TOML the installer emits.
+
+~~Codex plugin registration~~ — **dead, do not attempt.** The plugin
+installs, validates and reports `installed, enabled`, and Codex never invokes
+it. ~~Fresh-machine end-to-end~~ — **passed 2026-07-19** on the `binface`
+account: real vendored install, absolute interpreter, live events.
 
 ## v5 parking lot (not scoped)
 
@@ -53,12 +75,17 @@ schema/SSE/UI shape** — unchanged rule. `npm test` = bare `node --test`.
   only; `~/.claude/stats-cache.json` = daily activity counts). Don't rebuild
   the probe; if revisiting, check whether the `claude` CLI itself has grown a
   usage query, and remember Codex rollout files DO carry
-  `rate_limits {used_percent, resets_at, ...}` behind the plugin gate.
+  `rate_limits {used_percent, resets_at, ...}` — reachable once Codex capture
+  works via the config-hook path (the old "plugin gate" framing is obsolete).
 - **Codex rate-limit chip / rollout enrichment** — `codex exec --json`
   `turn.completed` + rollout `token_count` events carry usage the enricher
-  could consume (PROBE-NOTES.md §rollout).
+  could consume (PROBE-NOTES.md §rollout). Gated on the §18 rewrite.
 - **Codex lineage** — deferred in §24: the embedded hook schemas expose no
   parent field.
+- **Real Codex fixtures** — every `test/fixtures/codex/*-SYNTHETIC.json` was
+  inferred from binary schema strings. Two are now confirmed against live
+  payloads (field-for-field identical); the rest should be promoted to real
+  captures as part of the §18 rewrite.
 - **Events-file rotation** — the log grows unbounded; v4 added ~1 line per
   main-loop tool call (README documents truncate-any-time).
 - **Session-level capabilities UI** — the reducer collects
@@ -75,6 +102,22 @@ schema/SSE/UI shape** — unchanged rule. `npm test` = bare `node --test`.
   shipped groundwork: §30 non-coding starter agents (researcher/writer).
 
 ## Hard-won empirical facts — do NOT relearn these
+
+New 2026-07-19 (the Codex session, see `docs/CODEX-HOOKS-BOOTSTRAP.md`):
+
+- **`plugin_hooks` is a REMOVED Codex feature** and `--enable` will not
+  revive it. A plugin reporting `installed, enabled` proves nothing.
+- **Codex hook trust is hash-keyed to the hook config.** Approve once
+  interactively and headless `codex exec` is captured too — but *changing* the
+  config re-prompts, so a later installer re-run silently drops capture.
+- **`binface` is a second macOS account on Simon's own Mac**, not a remote
+  box; it usually holds port 4747 with its own FleetView tailing its own
+  events file. Drive it with `sudo -iu binface zsh -ic '…'` — **never**
+  `bash -lc`, which misses its nvm setup (lives in `.zshrc`) and silently
+  falls through to Simon's node, baking `/Users/simon` paths into a
+  "fresh-machine" install. See `memory/binface-test-rig.md`.
+- **`/Users/Shared/fleetview/` is a two-way channel** between the accounts —
+  put commands there for Simon to run in binface, read his results back.
 
 Everything in the v3 list still holds (see `V4-BOOTSTRAP.md`; keep: failing
 tools emit PreToolUse only; TaskCreate id arrives in the Post response;
