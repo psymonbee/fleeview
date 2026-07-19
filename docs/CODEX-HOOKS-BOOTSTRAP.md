@@ -126,21 +126,29 @@ re-prompts. The installer's instructions must say so, or users who later
 re-run the installer will silently lose capture until they re-approve — the
 exact silent-failure class as §17.4.
 
-### Remaining gap (smaller, no longer blocking)
+### Remaining gap — CLOSED 2026-07-19 (probe #2)
 
-Only 3 of the 10 wired events had anything to fire on — a "say hi" turn makes
-no tool calls, spawns no subagents, triggers no compaction. **`PreToolUse` /
-`PostToolUse` are still unverified against a real payload**, and they are the
-two that matter most (they drive the activity line and files-touched chips).
-Also unresolved: whether config-level tool hooks need a `matcher`, and in what
-dialect — FleetView emits `"*"`, OpenAI's own plugins use `"Bash"` /
-`"Write|Edit"`.
+Probe #2 (tool-forcing prompt in binface, raw dumpers on all 10 events with
+four matcher variants, results in `/Users/Shared/fleetview/probe/results/`):
 
-Cheap to close: same account, one prompt that forces a tool call
-(`codex exec --skip-git-repo-check "run the command: echo probe"`), then read
-the new events. Do this early — it could still change the TOML the installer
-emits. Use the raw-dumper pattern in the Appendix to capture the payloads and
-promote all remaining `-SYNTHETIC` fixtures to real ones.
+- **`PreToolUse`/`PostToolUse` fire and are captured live** — on the
+  already-trusted matcher-less config, no bypass flag, end to end:
+  `session.activity {tool:"Bash", hint:"echo probe"}` landed in
+  `events.jsonl` via the unchanged adapter.
+- **Matcher question answered: omit it.** No matcher = fires for every
+  tool. `"*"` and `"Bash"` also fire; `"shell"` never does — the real
+  `tool_name` is `"Bash"`: Codex tool names are Claude-compatible, the
+  synthetic fixtures' `"shell"` guess was wrong. Multiple
+  `[[hooks.Event]]` entries with mixed matchers parse fine in one config.
+- **Real payloads captured** for SessionStart, UserPromptSubmit,
+  PreToolUse, PostToolUse, Stop (5 of 10). Schema-exact vs the binary
+  schemas; value corrections: `tool_use_id` is `exec-<uuid>`, Bash
+  `tool_response` is the plain stdout string, `Stop` carries
+  `stop_hook_active` + `last_assistant_message`. SubagentStart/Stop,
+  Pre/PostCompact, PermissionRequest never fired and stay `-SYNTHETIC`.
+- **Trust survives a byte-identical config round-trip** — probe swapped
+  the config for dumpers (bypass flag, probe-only), restored it, and
+  captured again with no bypass and no re-approval.
 
 ## Shape of the fix
 
@@ -188,9 +196,9 @@ Delivery swap. Capture logic stays.
   interpreter path (§17.4), and a malformed matcher all fail with no output.
   Every acceptance step must assert on a **captured event**, never on a
   command exiting 0.
-- Matcher shape: FleetView emits `"*"` for tool events; OpenAI's own plugins
-  use regex-ish `"Bash"` / `"Write|Edit"`. Unverified which Codex expects for
-  config-level hooks — check when `PreToolUse` is captured.
+- ~~Matcher shape unverified~~ — ANSWERED (probe #2): omit the matcher
+  entirely; `"*"` and exact Claude-style names (`"Bash"`) also work,
+  `"shell"` matches nothing. Codex tool names are Claude-compatible.
 - `CODEX_HOME=<dir>` fully isolates a scratch Codex — use it for anything
   that doesn't need auth. It does **not** carry credentials, so any test
   needing a model turn must run in a real account.
@@ -200,9 +208,10 @@ Delivery swap. Capture logic stays.
 
 ## Acceptance
 
-1. ~~Trust probe answered~~ — **done, see above**. Carry the result into the
-   spec. Close the `PreToolUse`/`PostToolUse` + matcher gap early, since it
-   can still change the emitted TOML.
+1. ~~Trust probe answered~~ — **done**. ~~Close the
+   `PreToolUse`/`PostToolUse` + matcher gap~~ — **done 2026-07-19, probe #2
+   (see "Remaining gap — CLOSED")**: emit NO matcher; real payloads for 5
+   of 10 events captured. Both results carried into spec §18.4–§18.6.
 2. Spec §18 rewritten and merged before implementation (standing rule).
 3. Installer emits a correct `[hooks.*]` block with an absolute interpreter;
    install suite asserts the TOML shape and the absolute path.

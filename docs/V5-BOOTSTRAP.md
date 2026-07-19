@@ -58,10 +58,13 @@ you are picking up **instead of** re-deriving from this file:
 1. **Re-run the installer on Simon's own machine.** His live hooks still read
    bare `node` (installed before §17.4); it works only because he launches
    from an nvm-loaded shell. Proven fixed on a clean account, not on his.
-2. **Close the tool-event gap** (see the Codex bootstrap): one Codex run in
-   `binface` with a prompt that forces a tool call, to verify
-   `PreToolUse`/`PostToolUse` payloads and settle the `matcher` question.
-   Do it early — it can still change the TOML the installer emits.
+2. ~~Close the tool-event gap~~ — **done 2026-07-19 (probe #2, driven via
+   `sudo -iu binface` from Simon's side — no profile switch)**:
+   `PreToolUse`/`PostToolUse` fire and were captured live on the trusted
+   matcher-less config; real `tool_name` is `"Bash"` (Claude-compatible
+   names — the `"shell"` guess was wrong); installer TOML emits **no
+   matcher**. Raw payloads for 5 of 10 events captured; see the Codex
+   bootstrap "Remaining gap — CLOSED" + spec §18.5.
 
 ~~Codex plugin registration~~ — **dead, do not attempt.** The plugin
 installs, validates and reports `installed, enabled`, and Codex never invokes
