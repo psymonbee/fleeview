@@ -2,8 +2,10 @@
 // event schema (docs/FLEETVIEW-SPEC.md §18). Stateless and pure: never
 // throws, malformed/unwanted input maps to []. Field names are verified
 // against the draft-07 schemas embedded in the Codex 0.144.5 binary
-// (test/fixtures/codex/schemas/ — see PROBE-NOTES.md); live hook payloads
-// could not be captured because hooks are plugin-gated (§18.1).
+// (test/fixtures/codex/schemas/ — see PROBE-NOTES.md) and, for the events
+// exercised live via user-level config.toml hooks (§18.5), against real
+// captured payloads. Codex tool names are Claude-style ("Bash"), so the
+// hint/file heuristics below apply to Codex payloads unchanged.
 //
 // Every id crossing this boundary is namespaced "codex:<raw>" so a shared
 // events file can never collide with claude-code session/agent ids.

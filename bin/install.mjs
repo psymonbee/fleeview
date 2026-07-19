@@ -168,10 +168,14 @@ function removeHooks(settings) {
   if (Object.keys(settings.hooks).length === 0) delete settings.hooks;
 }
 
-// Codex hooks are plugin-gated (spec §18.1), so --with-codex only scaffolds a
-// plugin package and prints the registration commands — the `codex plugin add`
-// itself is a persistent, account-linked change the user performs. We never
-// run codex commands or write under ~/.codex.
+// Codex loads hooks only from the user-level ~/.codex/config.toml (spec
+// §18.4). Plugin delivery is a REMOVED Codex feature — a plugin installs,
+// validates, reports "installed, enabled", and is never invoked (§18.6);
+// do not re-attempt it. --with-codex therefore PRINTS the [hooks.*] block
+// for the user to paste: the installer never runs codex commands and never
+// writes under ~/.codex. Hook trust is hash-keyed to the exact block text
+// (§18.5), so putting it in place — and re-approving after any change — is
+// deliberately the user's action.
 const CODEX_EVENTS = [
   "PreToolUse",
   "PermissionRequest",
@@ -184,80 +188,37 @@ const CODEX_EVENTS = [
   "SubagentStop",
   "Stop",
 ];
-const CODEX_TOOL_EVENTS = new Set(["PreToolUse", "PostToolUse"]);
 
-// Codex 0.144.5 splits "marketplace" (a manifest that lists plugins) from
-// "plugin"; `codex plugin marketplace add` takes a MARKETPLACE root, so we
-// scaffold the full wrapper (spec §18.4/§18.5): a marketplace manifest under
-// `.agents/plugins/` plus the plugin itself under `plugins/fleetview/`. The
-// plugin manifest must NOT carry a `hooks` field — Codex ingestion rejects it
-// as unsupported — the sibling hooks.json is auto-discovered by convention.
-function scaffoldCodexPlugin(marketplaceRoot, hookScriptPath) {
-  const pluginRoot = join(marketplaceRoot, "plugins", "fleetview");
-
-  mkdirSync(join(marketplaceRoot, ".agents", "plugins"), { recursive: true });
-  writeFileSync(
-    join(marketplaceRoot, ".agents", "plugins", "marketplace.json"),
-    `${JSON.stringify(
-      {
-        name: "fleetview",
-        interface: { displayName: "FleetView" },
-        plugins: [
-          {
-            name: "fleetview",
-            source: { source: "local", path: "./plugins/fleetview" },
-            policy: { installation: "AVAILABLE", authentication: "ON_INSTALL" },
-            category: "Engineering",
-          },
-        ],
-      },
-      null,
-      2
-    )}\n`
-  );
-
-  mkdirSync(join(pluginRoot, ".codex-plugin"), { recursive: true });
-  writeFileSync(
-    join(pluginRoot, ".codex-plugin", "plugin.json"),
-    `${JSON.stringify(
-      {
-        name: "fleetview",
-        version: "4.0.0",
-        description: "FleetView capture hooks for Codex CLI (experimental)",
-        author: { name: "FleetView" },
-        interface: {
-          displayName: "FleetView",
-          shortDescription: "Live fleet-activity capture for Codex sessions.",
-          longDescription:
-            "FleetView wires Codex hook events to a local observer so Codex agent activity renders on the FleetView canvas alongside Claude Code.",
-          developerName: "FleetView",
-          category: "Engineering",
-          capabilities: [],
-          defaultPrompt: ["Run a task in Codex and watch it appear on FleetView."],
-        },
-      },
-      null,
-      2
-    )}\n`
-  );
-
-  const hooks = {};
+// No matcher on any entry: omitting it fires for every tool (verified live,
+// §18.5 — and the real tool names are Claude-style, e.g. "Bash", so a
+// "shell" matcher would silently match nothing).
+function codexConfigBlock(hookScriptPath) {
+  const lines = ["# --- FleetView capture hooks ---"];
   for (const eventName of CODEX_EVENTS) {
-    const hookDef = { type: "command", command: `${NODE_BIN} ${hookScriptPath} codex` };
-    hooks[eventName] = [
-      CODEX_TOOL_EVENTS.has(eventName)
-        ? { matcher: "*", hooks: [hookDef] }
-        : { hooks: [hookDef] },
-    ];
+    lines.push(`[[hooks.${eventName}]]`);
+    lines.push(`[[hooks.${eventName}.hooks]]`);
+    lines.push('type = "command"');
+    lines.push(`command = "${NODE_BIN} ${hookScriptPath} codex"`);
+    lines.push("");
   }
-  writeFileSync(join(pluginRoot, "hooks.json"), `${JSON.stringify({ hooks }, null, 2)}\n`);
+  return lines.join("\n");
+}
 
-  console.log(`Scaffolded Codex plugin marketplace at ${marketplaceRoot} (experimental).`);
-  console.log("Codex hooks only run from a registered plugin. To register it, run these yourself");
-  console.log("(this records the plugin into your Codex installation):");
-  console.log(`  codex plugin marketplace add ${marketplaceRoot}`);
-  console.log("  codex plugin add fleetview@fleetview");
-  console.log("No-plugin alternative (turn boundaries only): add to ~/.codex/config.toml:");
+function printCodexInstructions(hookScriptPath) {
+  console.log("");
+  console.log("Codex capture (experimental) — nothing was written; wire it yourself in two steps:");
+  console.log("");
+  console.log("1. Paste this block at the END of ~/.codex/config.toml:");
+  console.log("");
+  console.log(codexConfigBlock(hookScriptPath));
+  console.log("2. Run `codex` interactively once and approve its hook-trust prompt.");
+  console.log("   Headless `codex exec` sessions are then captured too.");
+  console.log("");
+  console.log("Trust is tied to the exact hook text above. If it ever changes — including a");
+  console.log("FleetView re-install printing a fresh block — Codex silently stops capturing");
+  console.log("until you re-approve: no warning, no error, no events.");
+  console.log("Alternative without hooks (turn boundaries only; requires the `notify` key to");
+  console.log("be free — some tools already claim it): add to ~/.codex/config.toml:");
   console.log(`  notify = ["${NODE_BIN}", "${hookScriptPath}", "codex-notify"]`);
 }
 
@@ -326,8 +287,8 @@ function printUsage() {
       "  --yes           non-interactive, skip confirmation",
       "  --uninstall     remove FleetView's hook entries from ~/.claude/settings.json",
       "  --dev <path>    wire hooks at an existing checkout instead of vendoring a copy",
-      "  --with-codex    experimental — scaffold a Codex hooks plugin + print registration steps",
-      "                  (plugin dir: <app>/codex-plugin, or ~/.lumenade/codex-plugin with --dev)",
+      "  --with-codex    experimental — print the ~/.codex/config.toml hooks block + trust",
+      "                  steps (prints only; you paste it — nothing under ~/.codex is touched)",
       "  --with-agents   copy the five starter agents (builder/checker/codex-runner/",
       "                  researcher/writer) into ~/.claude/agents (never overwrites a file",
       "                  already there)",
@@ -412,10 +373,7 @@ async function main() {
   console.log(`Wired FleetView's hooks into ${settingsPath}.`);
 
   if (opts.withCodex) {
-    const marketplaceRoot = appDir
-      ? join(appDir, "codex-plugin")
-      : join(home, ".lumenade", "codex-plugin");
-    scaffoldCodexPlugin(marketplaceRoot, hookScriptPath);
+    printCodexInstructions(hookScriptPath);
   }
 
   if (opts.withAgents) {

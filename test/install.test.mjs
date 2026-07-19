@@ -303,110 +303,65 @@ describe("bin/install.mjs — --with-codex (§18.4/§18.5)", () => {
     "Stop",
   ];
 
-  test("scaffolds a registerable marketplace + plugin and prints registration steps; never touches ~/.codex", () => {
+  test("prints the ~/.codex/config.toml hooks block — no matcher, absolute interpreter, trust contract; writes nothing", () => {
     const home = makeScratchHome();
     try {
       const result = runInstaller(home, ["--yes", "--with-codex"]);
       assert.equal(result.status, 0, `stderr: ${result.stderr}`);
 
-      const marketplaceRoot = join(home, ".lumenade", "app", "codex-plugin");
-
-      // marketplace manifest lists the plugin (§18.4) — this is what
-      // `codex plugin marketplace add` consumes.
-      const marketplace = JSON.parse(
-        readFileSync(join(marketplaceRoot, ".agents", "plugins", "marketplace.json"), "utf8")
-      );
-      assert.equal(marketplace.name, "fleetview");
-      assert.equal(marketplace.plugins.length, 1);
-      const [entry] = marketplace.plugins;
-      assert.equal(entry.name, "fleetview");
-      assert.equal(entry.source.source, "local");
-      assert.equal(entry.source.path, "./plugins/fleetview");
-      assert.equal(entry.policy.installation, "AVAILABLE");
-      assert.ok(entry.category, "marketplace entry declares a category");
-
-      // plugin manifest is validation-ready and declares NO hooks field.
-      const pluginRoot = join(marketplaceRoot, "plugins", "fleetview");
-      const manifest = JSON.parse(
-        readFileSync(join(pluginRoot, ".codex-plugin", "plugin.json"), "utf8")
-      );
-      assert.equal(manifest.name, "fleetview");
-      assert.match(manifest.version, /^\d+\.\d+\.\d+$/, "strict semver version");
-      assert.equal(manifest.author.name, "FleetView");
-      for (const field of [
-        "displayName",
-        "shortDescription",
-        "longDescription",
-        "developerName",
-        "category",
-        "capabilities",
-        "defaultPrompt",
-      ]) {
-        assert.ok(field in manifest.interface, `interface.${field} present`);
-      }
-      assert.ok(
-        !("hooks" in manifest),
-        "plugin.json must not declare a hooks field (Codex ingestion rejects it)"
-      );
-
-      // hooks.json lives at the plugin root, discovered by convention.
-      const { hooks } = JSON.parse(readFileSync(join(pluginRoot, "hooks.json"), "utf8"));
-      assert.deepEqual(Object.keys(hooks).sort(), [...CODEX_EVENTS].sort());
+      // One array-of-tables entry per event (§18.4).
       for (const eventName of CODEX_EVENTS) {
-        const [hookEntry] = hooks[eventName];
-        const isToolEvent = eventName === "PreToolUse" || eventName === "PostToolUse";
-        assert.equal(hookEntry.matcher, isToolEvent ? "*" : undefined, `${eventName} matcher`);
+        assert.ok(result.stdout.includes(`[[hooks.${eventName}]]`), `${eventName} entry printed`);
         assert.ok(
-          hookEntry.hooks[0].command.endsWith("emit-event.mjs codex"),
-          `${eventName} command uses the codex adapter arg`
-        );
-        assert.ok(
-          hookEntry.hooks[0].command.startsWith("/"),
-          `${eventName} names an absolute interpreter, never a bare node (§17.4)`
-        );
-        assert.ok(
-          hookEntry.hooks[0].command.includes(join(home, ".lumenade", "app")),
-          `${eventName} command points at the vendored app`
+          result.stdout.includes(`[[hooks.${eventName}.hooks]]`),
+          `${eventName} nested hooks table printed`
         );
       }
 
-      assert.ok(
-        result.stdout.includes(`codex plugin marketplace add ${marketplaceRoot}`),
-        "prints marketplace registration"
-      );
-      assert.ok(
-        result.stdout.includes("codex plugin add fleetview@fleetview"),
-        "prints plugin install with the marketplace selector"
-      );
+      // Absolute interpreter (§17.4), codex adapter arg, vendored app path —
+      // asserted on the exact command line, once per event.
+      const hookScript = join(home, ".lumenade", "app", "hooks", "emit-event.mjs");
+      const commandLine = `command = "${process.execPath} ${hookScript} codex"`;
+      const occurrences = result.stdout.split(commandLine).length - 1;
+      assert.equal(occurrences, CODEX_EVENTS.length, "one absolute-interpreter command per event");
+
+      // §18.4: no matcher anywhere — omitting it fires for every tool; a
+      // wrong dialect ("shell") silently matches nothing.
+      assert.ok(!result.stdout.includes("matcher"), "no matcher emitted");
+
+      // The trust contract is load-bearing (§18.4): approval step + the
+      // silent-loss warning must both be in the printout.
+      assert.match(result.stdout, /trust/i, "prints the trust approval step");
+      assert.match(result.stdout, /silently stops capturing/i, "warns capture is silently lost on change");
+
       assert.ok(result.stdout.includes("codex-notify"), "prints notify alternative");
+      assert.ok(!result.stdout.includes("codex plugin"), "no dead plugin registration commands (§18.6)");
+      assert.ok(
+        !existsSync(join(home, ".lumenade", "app", "codex-plugin")),
+        "no plugin scaffold directory created"
+      );
       assert.ok(!existsSync(join(home, ".codex")), "nothing created under ~/.codex");
     } finally {
       rmSync(home, { recursive: true, force: true });
     }
   });
 
-  test("--dev --with-codex scaffolds the marketplace under ~/.lumenade/codex-plugin pointing at the checkout", () => {
+  test("--dev --with-codex prints commands pointing at the checkout; still no vendored copy", () => {
     const home = makeScratchHome();
     try {
       const devPath = join(home, "dev-checkout");
       const result = runInstaller(home, ["--yes", "--dev", devPath, "--with-codex"]);
       assert.equal(result.status, 0, `stderr: ${result.stderr}`);
 
-      const marketplaceRoot = join(home, ".lumenade", "codex-plugin");
-      const marketplace = JSON.parse(
-        readFileSync(join(marketplaceRoot, ".agents", "plugins", "marketplace.json"), "utf8")
-      );
-      assert.equal(marketplace.plugins[0].source.path, "./plugins/fleetview");
+      const commandLine = `command = "${process.execPath} ${join(devPath, "hooks", "emit-event.mjs")} codex"`;
+      const occurrences = result.stdout.split(commandLine).length - 1;
+      assert.equal(occurrences, CODEX_EVENTS.length, "every command points at the dev checkout");
 
-      const { hooks } = JSON.parse(
-        readFileSync(join(marketplaceRoot, "plugins", "fleetview", "hooks.json"), "utf8")
-      );
-      const [entry] = hooks.SessionStart;
-      assert.equal(
-        entry.hooks[0].command,
-        `${process.execPath} ${join(devPath, "hooks", "emit-event.mjs")} codex`
-      );
       assert.ok(!existsSync(join(home, ".lumenade", "app")), "still no vendored copy");
+      assert.ok(
+        !existsSync(join(home, ".lumenade", "codex-plugin")),
+        "no plugin scaffold directory under ~/.lumenade either"
+      );
     } finally {
       rmSync(home, { recursive: true, force: true });
     }

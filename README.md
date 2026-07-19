@@ -62,9 +62,9 @@ npm start
 
 `--dev <path>` wires the hooks at that checkout instead of vendoring, so
 repo edits take effect without reinstalling. Other flags: `--yes` (skip the
-confirmation prompt), `--with-agents` (below), `--with-codex` (wire the
-experimental Codex hooks too), `--start` (launch the server once
-installed), `--uninstall` (below).
+confirmation prompt), `--with-agents` (below), `--with-codex` (print the
+experimental Codex wiring block — see below), `--start` (launch the server
+once installed), `--uninstall` (below).
 
 ### No orchestration yet? `--with-agents`
 
@@ -200,17 +200,24 @@ sidecar only reads transcript files Claude Code already writes to disk.
 FleetView ships an adapter for the Codex CLI (`adapters/codex.mjs`) that
 maps Codex's hook events onto the same neutral schema, with every id
 namespaced `codex:<raw id>` so a concurrent Codex session and Claude Code
-session in the same events log never collide. Wire it with:
+session in the same events log never collide. Wire it in two steps:
 
 ```sh
 npx github:psymonbee/fleeview --with-codex
 ```
 
-The field mapping was verified against real captured Codex hook payloads,
-not assumed (`docs/FLEETVIEW-SPEC.md` §18). Codex has no
-Stop/SessionEnd/UserPromptSubmit-equivalent hook, so turn-active state is
-best-effort and the hub just doesn't pulse for Codex sessions — spawns,
-activity, files, and tokens all render the same as a Claude Code fleet.
+prints a `[hooks.*]` block — paste it at the end of `~/.codex/config.toml`,
+then run `codex` once interactively and approve its hook-trust prompt.
+After that, headless `codex exec` runs are captured too. Codex ties the
+approval to the exact hook text, so if the block ever changes (including a
+reinstall printing a fresh one), capture stops **silently** until you
+re-approve. The installer itself never runs `codex` commands and never
+edits `~/.codex/*`.
+
+The delivery path and field mapping are verified against live captured
+Codex hook payloads (`docs/FLEETVIEW-SPEC.md` §18): session, turn, and
+tool-activity events all fire. Codex has no SessionEnd hook, so idle Codex
+sessions age off the canvas via the 24 h prune rather than ending crisply.
 This path is newer and less exercised; expect rough edges.
 
 ## Removal
