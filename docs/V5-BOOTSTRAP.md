@@ -67,6 +67,12 @@ schema/SSE/UI shape** — unchanged rule. `npm test` = bare `node --test`.
 - Smaller nits: `.hub` height went 72→88px for the activity line (revisit if
   hub layout evolves); narrator sidecar still off by default and unexercised
   in v4.
+- **AI-composed card content (v6/v7)** — design note in
+  `docs/COMPOSABLE-CARDS.md`: Haiku reads the initial prompt/plan once and
+  emits palette-constrained layout hints per agentType; UI composes cards
+  from blocks it already draws; every failure mode falls back to today's
+  fixed card. Narrator sidecar (§14) is the architectural seed. Related
+  shipped groundwork: §30 non-coding starter agents (researcher/writer).
 
 ## Hard-won empirical facts — do NOT relearn these
 
