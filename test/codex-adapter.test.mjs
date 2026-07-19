@@ -1,8 +1,11 @@
-// Codex adapter test suite (docs/FLEETVIEW-SPEC.md §18). Fixtures marked
-// -SYNTHETIC are schema-exact shapes with fabricated values (hooks are
-// plugin-gated, §18.1 — no live payloads exist); each is validated against
-// the binary-extracted schema's `required` list so field drift fails loudly.
-// notify-turn-ended.json is the one genuinely live-captured payload.
+// Codex adapter test suite (docs/FLEETVIEW-SPEC.md §18). Fixtures without a
+// suffix are real payloads captured live via user-level config.toml hooks
+// (§18.5, probes of 2026-07-19; paths sanitized). Fixtures marked -SYNTHETIC
+// are schema-exact shapes with fabricated values for the events no probe has
+// fired yet (subagents, compaction, permission requests). Every payload
+// fixture is validated against the binary-extracted schema's `required` +
+// `properties` lists so field drift fails loudly. notify-turn-ended.json is
+// a live capture of the separate notify mechanism (argv, not stdin).
 
 import { test, describe } from "node:test";
 import assert from "node:assert/strict";
@@ -24,8 +27,10 @@ function loadFixture(name) {
   return loadJson(join(FIXTURES_DIR, name));
 }
 
-const syntheticFixtures = readdirSync(FIXTURES_DIR).filter((f) =>
-  f.endsWith("-SYNTHETIC.json")
+// Every hook-payload fixture, live-captured and synthetic alike; the notify
+// capture is excluded (different mechanism, different shape).
+const payloadFixtures = readdirSync(FIXTURES_DIR).filter(
+  (f) => f.endsWith(".json") && f !== "notify-turn-ended.json"
 );
 
 // hook_event_name -> schema basename (PascalCase -> kebab-case)
@@ -35,7 +40,7 @@ function schemaFor(hookEventName) {
 }
 
 describe("codex fixtures match the binary-extracted schemas", () => {
-  for (const name of syntheticFixtures) {
+  for (const name of payloadFixtures) {
     test(`${name} carries every schema-required field`, () => {
       const fixture = loadFixture(name);
       const schema = schemaFor(fixture.hook_event_name);
@@ -53,7 +58,7 @@ describe("codex fixtures match the binary-extracted schemas", () => {
 });
 
 describe("codex adapter envelope", () => {
-  for (const name of syntheticFixtures) {
+  for (const name of payloadFixtures) {
     test(`${name} -> v1 envelope, source codex, namespaced sessionId`, () => {
       const events = translate(loadFixture(name));
       assert.ok(Array.isArray(events));
@@ -71,23 +76,23 @@ describe("codex adapter envelope", () => {
 });
 
 describe("codex adapter mapping (§18.3)", () => {
-  test("session-start -> session.start with cwd + transcriptPath", () => {
-    const events = translate(loadFixture("session-start-SYNTHETIC.json"));
+  test("session-start (live capture) -> session.start with cwd + transcriptPath", () => {
+    const events = translate(loadFixture("session-start.json"));
     assert.equal(events.length, 1);
     const [event] = events;
     assert.equal(event.kind, "session.start");
-    assert.equal(event.cwd, "/home/user/project");
+    assert.equal(event.cwd, "/Users/user");
     assert.ok(event.transcriptPath.endsWith(".jsonl"));
   });
 
-  test("user-prompt-submit -> turn.start", () => {
-    const events = translate(loadFixture("user-prompt-submit-SYNTHETIC.json"));
+  test("user-prompt-submit (live capture) -> turn.start", () => {
+    const events = translate(loadFixture("user-prompt-submit.json"));
     assert.equal(events.length, 1);
     assert.equal(events[0].kind, "turn.start");
   });
 
-  test("stop -> turn.end", () => {
-    const events = translate(loadFixture("stop-SYNTHETIC.json"));
+  test("stop (live capture) -> turn.end", () => {
+    const events = translate(loadFixture("stop.json"));
     assert.equal(events.length, 1);
     assert.equal(events[0].kind, "turn.end");
   });
@@ -118,8 +123,8 @@ describe("codex adapter mapping (§18.3)", () => {
     const [event] = events;
     assert.equal(event.kind, "agent.activity");
     assert.equal(event.phase, "start");
-    assert.equal(event.callId, "call_0001");
-    assert.equal(event.tool, "shell");
+    assert.equal(event.callId, "exec-00000000-0000-4000-8000-000000000001");
+    assert.equal(event.tool, "Bash");
     assert.equal(event.hint, "Run the unit tests");
   });
 
@@ -129,17 +134,22 @@ describe("codex adapter mapping (§18.3)", () => {
     const [event] = events;
     assert.equal(event.kind, "agent.activity");
     assert.equal(event.phase, "end");
-    assert.equal(event.callId, "call_0001");
+    assert.equal(event.callId, "exec-00000000-0000-4000-8000-000000000001");
   });
 
-  test("main-loop pre-tool-use (no agent_id) -> session.activity (§25 parity, was [] in v3)", () => {
-    const events = translate(loadFixture("pre-tool-use-mainloop-SYNTHETIC.json"));
+  test("main-loop pre-tool-use (live capture, no agent_id) -> session.activity (§25 parity)", () => {
+    const events = translate(loadFixture("pre-tool-use-mainloop.json"));
     assert.equal(events.length, 1);
     const [event] = events;
     assert.equal(event.kind, "session.activity");
-    assert.equal(event.tool, "shell");
-    assert.equal(event.hint, "ls");
-    assert.equal(event.sessionId, "codex:019f0000-aaaa-7000-8000-000000000001");
+    assert.equal(event.tool, "Bash");
+    assert.equal(event.hint, "echo probe");
+    assert.equal(event.sessionId, "codex:019f7ba3-31e6-7e10-b4a2-21cb760d927e");
+  });
+
+  test("main-loop post-tool-use (live capture, no agent_id) -> [] (§18.3)", () => {
+    const events = translate(loadFixture("post-tool-use-mainloop.json"));
+    assert.deepEqual(events, []);
   });
 
   test("permission-request -> session.activity {tool:'permission', hint: tool_name} (§28c)", () => {
@@ -148,7 +158,7 @@ describe("codex adapter mapping (§18.3)", () => {
     const [event] = events;
     assert.equal(event.kind, "session.activity");
     assert.equal(event.tool, "permission");
-    assert.equal(event.hint, "shell");
+    assert.equal(event.hint, "Bash");
   });
 
   test("pre-compact -> session.activity {tool:'compact', hint:'pre'} (§28c)", () => {

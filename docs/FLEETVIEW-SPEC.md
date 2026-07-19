@@ -721,7 +721,8 @@ Found on the first fresh-machine run (2026-07-18): Claude launched from
 invisible on a dev box that launches the `claude` CLI from an nvm-loaded
 shell, because the hook then inherits that shell's `PATH` — which is exactly
 why v1–v4 never caught it. Applies to all three emitters: the 8 Claude
-hooks, the 10 Codex plugin hooks, and the printed `notify` fallback.
+hooks, the 10 Codex config hooks (§18.4), and the printed `notify`
+fallback.
 Trade-off accepted: the baked path pins the node that ran the installer, so
 removing that node version requires re-running the installer.
 
@@ -1221,7 +1222,7 @@ main-loop tool call, no agent involved. Additive.
 {tool: tool_name, hint, file}` (same hint/file derivation as
 `agent.activity`). **Pre only** — main-loop `PostToolUse` of plain tools
 stays `[]` (halves the volume; no duration display at session level).
-The codex adapter additionally maps its plugin-gated `PermissionRequest`
+The codex adapter additionally maps Codex's `PermissionRequest`
 → `session.activity {tool: "permission", hint: tool_name}` and
 `PreCompact`/`PostCompact` → `session.activity {tool: "compact",
 hint: "pre"|"post"}` (closes §18.3's unmapped rows; §28c).

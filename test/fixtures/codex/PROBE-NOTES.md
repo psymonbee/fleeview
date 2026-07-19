@@ -340,3 +340,20 @@ The scratch git repo and all candidate hooks.json/config.toml files used during 
 under `/private/tmp/claude-501/-Users-simon-lumenADE/6c8f0e3f-1031-4f40-8491-749526a75347/scratchpad/codex-probe/`
 and were never copied anywhere persistent. No files under `~/.codex` were created or modified. No plugins
 were installed; `codex plugin list` was only read, never mutated.
+
+## Probe #2 — live payloads via user-level config hooks (2026-07-19)
+
+The §18.1 "hooks are plugin-gated" inference above was wrong (see spec
+§18.5–§18.6): hooks declared in the user-level `~/.codex/config.toml` fire,
+and `plugin_hooks` is a REMOVED feature in 0.144.5. A tool-forcing
+`codex exec` run in a real authenticated account (raw stdin dumpers wired to
+all 10 events, four matcher variants) captured live payloads for
+SessionStart, UserPromptSubmit, PreToolUse, PostToolUse, and Stop — now the
+suffix-less fixtures in this directory (paths sanitized `/Users/<account>` →
+`/Users/user`; all other bytes as captured). Key value corrections vs the
+old synthetics: `tool_name` is `"Bash"` (Claude-style names — `"shell"` was
+a wrong guess), `tool_use_id` is `exec-<uuid>`, Bash `tool_response` is the
+plain stdout string. Matcher semantics: omitted = fires for every tool;
+`"*"` and `"Bash"` also fire; `"shell"` never does. SubagentStart/Stop,
+Pre/PostCompact, and PermissionRequest have still never fired in any probe
+and remain `-SYNTHETIC` (values updated to the corrected dialect).
