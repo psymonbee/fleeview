@@ -16,6 +16,12 @@ fire correctly, and FleetView's existing adapter turns them into correct
 neutral events **unchanged**. Proven live, first attempt. The fix is a
 delivery-mechanism swap, not new capture logic.
 
+**Proven end to end** on a real authenticated Codex (2026-07-19): approve the
+hook-trust prompt once interactively, and headless `codex exec` then captures
+on its own — `session.start`, `turn.start`, `turn.end`, correctly namespaced,
+no bypass flag. Nothing about this feature is speculative any more. See
+"Probe gate — ANSWERED" below.
+
 ## The evidence (all verified 2026-07-19 — do NOT re-probe)
 
 ### 1. Plugin hooks are removed, permanently
@@ -87,36 +93,54 @@ It tried four `hooks.json` locations plus a **project-level**
 plugin-gated." It never tried the **user-level** config with the struct
 shape. That one untested inference sent v3 and v4 down a dead road.
 
-## Probe gate — ONE question must be answered before spec work
-
-Everything above is settled. This is not:
+## Probe gate — ANSWERED 2026-07-19: trust persists ✅
 
 > **Does interactively granting hook trust persist, and does that trust then
 > apply to headless `codex exec`?**
+>
+> **YES.** Verified end to end in the `binface` account on a real,
+> authenticated Codex.
 
-It matters because it decides the product:
+Sequence run: `[hooks.*]` block appended to binface's `~/.codex/config.toml`
+(10 events) → interactive `codex`, trust prompt approved once → quit →
+`codex exec --skip-git-repo-check "say hi"` with **no** bypass flag. Captured
+in `~/.lumenade/events.jsonl`:
 
-- **If yes** — the one-time user action is "run `codex` once, approve the
-  prompt." Clean, and `codex-runner` (headless) gets captured too.
-- **If trust is per-invocation, or interactive-only** — headless Codex can
-  only be captured with `--dangerously-bypass-hook-trust`, which FleetView
-  must **not** silently recommend. A passive observer telling people to
-  disable a safety prompt is not acceptable; it would need to be a loud,
-  explicit, user-typed choice, and `codex-runner` capture may be off the
-  table.
+```json
+{"v":1,"source":"codex","t":"2026-07-19T17:40:03.924Z","sessionId":"codex:019f7b76-ab4a-78f1-939d-2fceabfa8e3e","kind":"session.start","cwd":"/Users/binface/test","transcriptPath":"/Users/binface/.codex/sessions/2026/07/19/rollout-…jsonl"}
+{"v":1,"source":"codex","t":"2026-07-19T17:40:03.972Z","sessionId":"codex:019f7b76-…","kind":"turn.start"}
+{"v":1,"source":"codex","t":"2026-07-19T17:40:05.776Z","sessionId":"codex:019f7b76-…","kind":"turn.end"}
+```
 
-This needs a **real authenticated Codex session** — an isolated `CODEX_HOME`
-401s before tool events fire. Run it in the `binface` account (see
-`memory/binface-test-rig.md`; drive it with `sudo -iu binface zsh -ic '…'`,
-**never** `bash -lc`). Sequence: write the `[hooks.*]` block into binface's
-`~/.codex/config.toml` → run interactive `codex` → approve the trust prompt →
-quit → run `codex exec` with **no** bypass flag → check
-`~/.lumenade/events.jsonl`.
+`SessionStart` → `session.start` (with `cwd` + `transcriptPath`),
+`UserPromptSubmit` → `turn.start`, `Stop` → `turn.end`. Correct `codex:`
+namespacing throughout, adapter unmodified.
 
-While there, capture the eight unverified payloads (`PreToolUse`,
-`PostToolUse`, `Stop`, `SubagentStart`, `SubagentStop`, `PreCompact`,
-`PostCompact`, `PermissionRequest`) with the raw dumper pattern in the
-Appendix and promote them to real fixtures.
+**Therefore the product is the good version:** the one-time user action is
+"paste a config block, run `codex` once, approve the prompt." Headless
+`codex exec` is captured, so `codex-runner` sessions appear on the canvas.
+FleetView never needs to recommend `--dangerously-bypass-hook-trust`.
+
+Trust is keyed to a **hash of the hook config**, so changing the block
+re-prompts. The installer's instructions must say so, or users who later
+re-run the installer will silently lose capture until they re-approve — the
+exact silent-failure class as §17.4.
+
+### Remaining gap (smaller, no longer blocking)
+
+Only 3 of the 10 wired events had anything to fire on — a "say hi" turn makes
+no tool calls, spawns no subagents, triggers no compaction. **`PreToolUse` /
+`PostToolUse` are still unverified against a real payload**, and they are the
+two that matter most (they drive the activity line and files-touched chips).
+Also unresolved: whether config-level tool hooks need a `matcher`, and in what
+dialect — FleetView emits `"*"`, OpenAI's own plugins use `"Bash"` /
+`"Write|Edit"`.
+
+Cheap to close: same account, one prompt that forces a tool call
+(`codex exec --skip-git-repo-check "run the command: echo probe"`), then read
+the new events. Do this early — it could still change the TOML the installer
+emits. Use the raw-dumper pattern in the Appendix to capture the payloads and
+promote all remaining `-SYNTHETIC` fixtures to real ones.
 
 ## Shape of the fix
 
@@ -176,7 +200,9 @@ Delivery swap. Capture logic stays.
 
 ## Acceptance
 
-1. Trust probe answered and written into the spec **before** any code.
+1. ~~Trust probe answered~~ — **done, see above**. Carry the result into the
+   spec. Close the `PreToolUse`/`PostToolUse` + matcher gap early, since it
+   can still change the emitted TOML.
 2. Spec §18 rewritten and merged before implementation (standing rule).
 3. Installer emits a correct `[hooks.*]` block with an absolute interpreter;
    install suite asserts the TOML shape and the absolute path.
