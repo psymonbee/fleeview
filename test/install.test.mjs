@@ -22,7 +22,13 @@ import { fileURLToPath } from "node:url";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const INSTALLER = join(__dirname, "..", "bin", "install.mjs");
-const STARTER_AGENTS = ["builder.md", "checker.md", "codex-runner.md"];
+const STARTER_AGENTS = [
+  "builder.md",
+  "checker.md",
+  "codex-runner.md",
+  "researcher.md",
+  "writer.md",
+];
 const EIGHT_EVENTS = [
   "SessionStart",
   "SessionEnd",
@@ -348,7 +354,7 @@ describe("bin/install.mjs — --with-codex (§18.4)", () => {
 });
 
 describe("bin/install.mjs — --with-agents (§23)", () => {
-  test("writes all 3 starter agents with parseable frontmatter and prints 'written'", () => {
+  test("writes all 5 starter agents with parseable frontmatter and prints 'written'", () => {
     const home = makeScratchHome();
     try {
       const result = runInstaller(home, ["--yes", "--with-agents"]);
@@ -386,7 +392,7 @@ describe("bin/install.mjs — --with-agents (§23)", () => {
         "stdout announces builder.md skipped"
       );
 
-      for (const file of ["checker.md", "codex-runner.md"]) {
+      for (const file of ["checker.md", "codex-runner.md", "researcher.md", "writer.md"]) {
         const dest = join(agentsDir(home), file);
         assert.ok(existsSync(dest), `${file} still written`);
         assert.ok(result.stdout.includes(`written ${dest}`), `stdout announces ${file} written`);
@@ -430,7 +436,7 @@ describe("bin/install.mjs — --with-agents (§23)", () => {
     }
   });
 
-  test("vendored ~/.lumenade/app contains starter-agents/ with all 3 files", () => {
+  test("vendored ~/.lumenade/app contains starter-agents/ with all 5 files", () => {
     const home = makeScratchHome();
     try {
       const result = runInstaller(home, ["--yes"]);

@@ -46,7 +46,13 @@ const VENDOR_WHITELIST = [
   "README.md",
   join("docs", "FLEETVIEW-SPEC.md"),
 ];
-const STARTER_AGENTS = ["builder.md", "checker.md", "codex-runner.md"];
+const STARTER_AGENTS = [
+  "builder.md",
+  "checker.md",
+  "codex-runner.md",
+  "researcher.md",
+  "writer.md",
+];
 
 function parseArgs(argv) {
   const opts = {
@@ -206,9 +212,9 @@ function scaffoldCodexPlugin(pluginDir, hookScriptPath) {
   console.log(`  notify = ["node", "${hookScriptPath}", "codex-notify"]`);
 }
 
-// Starter agents (spec §23): copy the three genericized agent definitions into
+// Starter agents (spec §23, §30): copy the genericized agent definitions into
 // ~/.claude/agents, never overwriting a file the user already has there. All
-// three are always offered — no PATH detection for codex; that's the owner's
+// of them are always offered — no PATH detection for codex; that's the owner's
 // call to make (or not) after the fact.
 function installStarterAgents(packageRoot, home) {
   const srcDir = join(packageRoot, "starter-agents");
@@ -273,8 +279,9 @@ function printUsage() {
       "  --dev <path>    wire hooks at an existing checkout instead of vendoring a copy",
       "  --with-codex    experimental — scaffold a Codex hooks plugin + print registration steps",
       "                  (plugin dir: <app>/codex-plugin, or ~/.lumenade/codex-plugin with --dev)",
-      "  --with-agents   copy the three starter agents (builder/checker/codex-runner) into",
-      "                  ~/.claude/agents (never overwrites a file already there)",
+      "  --with-agents   copy the five starter agents (builder/checker/codex-runner/",
+      "                  researcher/writer) into ~/.claude/agents (never overwrites a file",
+      "                  already there)",
       "  --start         run the server in the foreground after installing",
     ].join("\n")
   );
