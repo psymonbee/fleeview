@@ -678,9 +678,10 @@ default, the user's copy is preserved (notice printed).
    existing entry whose command contains `/hooks/emit-event.mjs`
    (dedupe/upgrade), then append
    `{"matcher": ".*"` (Pre/PostToolUse only) `, "hooks": [{"type":
-   "command", "command": "node <app>/hooks/emit-event.mjs", "timeout": 5}]}`
-   — `".*"` matches the verified live shape (README v2 showed `""`; the
-   installer emits `".*"`).
+   "command", "command": "<abs-node> <app>/hooks/emit-event.mjs", "timeout":
+   5}]}` — `".*"` matches the verified live shape (README v2 showed `""`; the
+   installer emits `".*"`). `<abs-node>` is an **absolute** interpreter path
+   (`process.execPath`), never a bare `node` — see §17.4.
 4. All other top-level keys and all non-FleetView hook entries preserved
    untouched. Write via temp file + rename. Key order may change
    (documented as acceptable).
@@ -703,6 +704,26 @@ stays (blocks registry publish only; git installs unaffected).
 `npx github:psymonbee/fleeview --uninstall` (or hand-delete the 8 hook
 entries), then `rm -rf ~/.lumenade`. Backups under `~/.claude/` are left
 for the user. No other machine state exists.
+
+### 17.4 Interpreter resolution (added 2026-07-18)
+
+Hook commands name the interpreter by **absolute path** — `process.execPath`
+captured at install time — never a bare `node`. Hooks are spawned by
+whatever launched the harness, and a GUI-launched `Claude.app` inherits the
+macOS default `PATH` (`/usr/bin:/bin:/usr/sbin:/sbin`), which contains **no**
+nvm/fnm/volta node. A bare `node` there fails with "command not found",
+and it fails *silently* — a failing hook neither blocks the harness nor
+surfaces an error — so `~/.lumenade/events.jsonl` is never created and the
+canvas stays permanently empty with no diagnostic.
+
+Found on the first fresh-machine run (2026-07-18): Claude launched from
+`/Applications/Claude.app`, node available only under `~/.nvm`. Structurally
+invisible on a dev box that launches the `claude` CLI from an nvm-loaded
+shell, because the hook then inherits that shell's `PATH` — which is exactly
+why v1–v4 never caught it. Applies to all three emitters: the 8 Claude
+hooks, the 10 Codex plugin hooks, and the printed `notify` fallback.
+Trade-off accepted: the baked path pins the node that ran the installer, so
+removing that node version requires re-running the installer.
 
 ## 18. Codex CLI adapter
 
@@ -809,11 +830,12 @@ LIVE file is a single atomic Write followed immediately by `node --check`.
 **Wiring reality (per §18.1):** hooks require an installed Codex plugin.
 The installer's `--with-codex` therefore (a) scaffolds a plugin package at
 `<app>/codex-plugin/` — `.codex-plugin/plugin.json` manifest +
-`hooks.json` wiring the 10 events to `node <app>/hooks/emit-event.mjs
-codex` — and (b) **prints** the registration instructions
+`hooks.json` wiring the 10 events to `<abs-node>
+<app>/hooks/emit-event.mjs codex` (absolute interpreter, §17.4) — and (b)
+**prints** the registration instructions
 (`codex plugin marketplace add` / `codex plugin add`) plus the no-plugin
 alternative: add
-`notify = ["node", "<app>/hooks/emit-event.mjs", "codex-notify"]` to
+`notify = ["<abs-node>", "<app>/hooks/emit-event.mjs", "codex-notify"]` to
 `~/.codex/config.toml` for turn-boundary capture only. The installer never
 runs `codex` commands and never edits `~/.codex/*` — registration is
 explicitly the user's action (persistent, account-linked).
