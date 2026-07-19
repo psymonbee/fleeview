@@ -186,15 +186,55 @@ const CODEX_EVENTS = [
 ];
 const CODEX_TOOL_EVENTS = new Set(["PreToolUse", "PostToolUse"]);
 
-function scaffoldCodexPlugin(pluginDir, hookScriptPath) {
-  mkdirSync(join(pluginDir, ".codex-plugin"), { recursive: true });
+// Codex 0.144.5 splits "marketplace" (a manifest that lists plugins) from
+// "plugin"; `codex plugin marketplace add` takes a MARKETPLACE root, so we
+// scaffold the full wrapper (spec §18.4/§18.5): a marketplace manifest under
+// `.agents/plugins/` plus the plugin itself under `plugins/fleetview/`. The
+// plugin manifest must NOT carry a `hooks` field — Codex ingestion rejects it
+// as unsupported — the sibling hooks.json is auto-discovered by convention.
+function scaffoldCodexPlugin(marketplaceRoot, hookScriptPath) {
+  const pluginRoot = join(marketplaceRoot, "plugins", "fleetview");
+
+  mkdirSync(join(marketplaceRoot, ".agents", "plugins"), { recursive: true });
   writeFileSync(
-    join(pluginDir, ".codex-plugin", "plugin.json"),
+    join(marketplaceRoot, ".agents", "plugins", "marketplace.json"),
     `${JSON.stringify(
       {
         name: "fleetview",
-        version: "3.0.0",
+        interface: { displayName: "FleetView" },
+        plugins: [
+          {
+            name: "fleetview",
+            source: { source: "local", path: "./plugins/fleetview" },
+            policy: { installation: "AVAILABLE", authentication: "ON_INSTALL" },
+            category: "Engineering",
+          },
+        ],
+      },
+      null,
+      2
+    )}\n`
+  );
+
+  mkdirSync(join(pluginRoot, ".codex-plugin"), { recursive: true });
+  writeFileSync(
+    join(pluginRoot, ".codex-plugin", "plugin.json"),
+    `${JSON.stringify(
+      {
+        name: "fleetview",
+        version: "4.0.0",
         description: "FleetView capture hooks for Codex CLI (experimental)",
+        author: { name: "FleetView" },
+        interface: {
+          displayName: "FleetView",
+          shortDescription: "Live fleet-activity capture for Codex sessions.",
+          longDescription:
+            "FleetView wires Codex hook events to a local observer so Codex agent activity renders on the FleetView canvas alongside Claude Code.",
+          developerName: "FleetView",
+          category: "Engineering",
+          capabilities: [],
+          defaultPrompt: ["Run a task in Codex and watch it appear on FleetView."],
+        },
       },
       null,
       2
@@ -210,13 +250,13 @@ function scaffoldCodexPlugin(pluginDir, hookScriptPath) {
         : { hooks: [hookDef] },
     ];
   }
-  writeFileSync(join(pluginDir, "hooks.json"), `${JSON.stringify({ hooks }, null, 2)}\n`);
+  writeFileSync(join(pluginRoot, "hooks.json"), `${JSON.stringify({ hooks }, null, 2)}\n`);
 
-  console.log(`Scaffolded Codex plugin at ${pluginDir} (experimental).`);
+  console.log(`Scaffolded Codex plugin marketplace at ${marketplaceRoot} (experimental).`);
   console.log("Codex hooks only run from a registered plugin. To register it, run these yourself");
   console.log("(this records the plugin into your Codex installation):");
-  console.log(`  codex plugin marketplace add ${pluginDir}`);
-  console.log("  codex plugin add fleetview");
+  console.log(`  codex plugin marketplace add ${marketplaceRoot}`);
+  console.log("  codex plugin add fleetview@fleetview");
   console.log("No-plugin alternative (turn boundaries only): add to ~/.codex/config.toml:");
   console.log(`  notify = ["${NODE_BIN}", "${hookScriptPath}", "codex-notify"]`);
 }
@@ -372,10 +412,10 @@ async function main() {
   console.log(`Wired FleetView's hooks into ${settingsPath}.`);
 
   if (opts.withCodex) {
-    const pluginDir = appDir
+    const marketplaceRoot = appDir
       ? join(appDir, "codex-plugin")
       : join(home, ".lumenade", "codex-plugin");
-    scaffoldCodexPlugin(pluginDir, hookScriptPath);
+    scaffoldCodexPlugin(marketplaceRoot, hookScriptPath);
   }
 
   if (opts.withAgents) {
