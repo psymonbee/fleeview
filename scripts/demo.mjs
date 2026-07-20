@@ -88,6 +88,10 @@ async function main() {
   await sleep(500);
   emit("session.activity", { tool: "Bash", hint: "git log --oneline -5" });
   await sleep(600);
+  // capability chip (§26) — session-level Skill call so the hub's own chip
+  // row (not just an agent card's) has something to render (§31.4)
+  emit("session.activity", { tool: "Skill", hint: "code-review" });
+  await sleep(500);
 
   emit("plan.doc", {
     markdown:
@@ -250,6 +254,11 @@ async function main() {
   });
   await sleep(600);
 
+  // persistence beat (§31.5) — orchestrator keeps working while the fleet
+  // story continues; activity persists through spawns per §13/§31.4
+  emit("session.activity", { tool: "Read", hint: "server/server.mjs" });
+  await sleep(500);
+
   // ---- 3. codex lane spawns via the fuzzy-claim path (in parallel) ------
   emit("agent.spawn-pending", { agentType: "codex-runner", description: "Build fleet canvas UI" });
   await sleep(500);
@@ -389,12 +398,19 @@ async function main() {
   });
   await sleep(1500);
 
+  // persistence beat (§31.5) — orchestrator activity continues past a
+  // subagent's end, keeping the hub alive between wrap-up and the next step
+  emit("session.activity", { tool: "Grep", hint: "grep -rn agent.end server/reducer.mjs" });
+  await sleep(500);
+
   // session-level usage beat (agentId: null) — main-loop transcript totals,
-  // distinct from any single subagent's tally
+  // distinct from any single subagent's tally; carries `model` (§31.2b) so
+  // the hub subtitle picks up "Claude Opus 4.8" mid-demo (§31.4)
   emit("agent.usage", {
     agentId: null,
     tokens: { in: 8000, out: 45000, cacheRead: 900000, cacheWrite: 30000 },
     costUsd: 1.0815,
+    model: "claude-opus-4-8",
   });
   await sleep(500);
 
@@ -423,6 +439,11 @@ async function main() {
   });
   await sleep(1300);
 
+  // capability chip (§26) — session-level mcp__* activity so the hub's own
+  // chip row (not just an agent card's) has something to render (§31.4)
+  emit("session.activity", { tool: "mcp__github__search_code", hint: 'search_code "SSE reconnect handling"' });
+  await sleep(500);
+
   // ---- 7. wrap up: remaining agents and steps finish, turn ends ----------
   emit("plan.step", { stepId: "plan-2", status: "done" });
   await sleep(500);
@@ -447,7 +468,12 @@ async function main() {
   emit("plan.step", { stepId: "plan-4", status: "active" });
   await sleep(500);
   emit("plan.step", { stepId: "plan-4", status: "done" });
-  await sleep(3000);
+  await sleep(1500);
+
+  // persistence beat (§31.5) — one more beat right before turn.end so the
+  // hub's activity-clear-on-turn.end transition is visible in the demo
+  emit("session.activity", { tool: "Bash", hint: "npm test -- --run" });
+  await sleep(1500);
 
   emit("turn.end");
 
