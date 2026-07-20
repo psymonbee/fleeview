@@ -111,8 +111,12 @@ function readSettings(settingsPath) {
 }
 
 function backupSettings(settingsPath, raw) {
-  const iso = new Date().toISOString();
-  const backupPath = `${settingsPath}.fleetview-backup-${iso}`;
+  // Windows forbids ':' in filenames (it's the drive/ADS separator), so a raw
+  // ISO timestamp like 2026-07-20T19:47:19.747Z makes writeFileSync throw
+  // ENOENT there — aborting the install before any hooks are wired. Swap the
+  // colons for '-'; the suffix stays sortable, unique, and cross-platform.
+  const stamp = new Date().toISOString().replace(/:/g, "-");
+  const backupPath = `${settingsPath}.fleetview-backup-${stamp}`;
   writeFileSync(backupPath, raw);
   return backupPath;
 }

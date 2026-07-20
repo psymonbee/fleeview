@@ -26,7 +26,7 @@ const CONFIG_PATH = path.resolve(__dirname, "..", "fleet.config.json");
 const PORT = Number(process.env.PORT) || 4747;
 const EVENTS_FILE =
   process.env.FLEET_EVENTS_FILE ||
-  path.join(process.env.HOME || "", ".lumenade", "events.jsonl");
+  path.join(homedir(), ".lumenade", "events.jsonl");
 
 const PING_INTERVAL_MS = 15000;
 const POLL_INTERVAL_MS = 1000;
