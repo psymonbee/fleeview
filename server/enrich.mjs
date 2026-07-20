@@ -39,7 +39,7 @@ function priceForModel(pricing, modelId) {
   return best ? pricing[best] : null;
 }
 
-export function createEnricher({ config, getTargets, onUsage }) {
+export function createEnricher({ config, getTargets, onUsage, onTitle }) {
   const enrichment = (config && config.enrichment) || {};
   const pricing = enrichment.pricing || {};
 
@@ -51,6 +51,8 @@ export function createEnricher({ config, getTargets, onUsage }) {
    *   lastCostUsd: number | null,
    *   model: string | null,
    *   lastModel: string | null,
+   *   title: string | null,
+   *   lastTitle: string | null,
    * }>}
    * keyed by the opaque target key the server hands us (e.g. "agent:<id>" /
    * "session:<id>") — this module never interprets the key, only stores
@@ -73,6 +75,8 @@ export function createEnricher({ config, getTargets, onUsage }) {
         lastCostUsd: null,
         model: null,
         lastModel: null,
+        title: null,
+        lastTitle: null,
       };
       state.set(key, s);
     }
@@ -133,17 +137,32 @@ export function createEnricher({ config, getTargets, onUsage }) {
     }
   }
 
+  // §32.4: reports the session title via onTitle iff it changed since the
+  // last report for this key. Separate from reportIfChanged so a rename with
+  // no new tokens still lands, and so onUsage's signature stays untouched.
+  function reportTitleIfChanged(key, s) {
+    if (typeof onTitle !== "function") return;
+    if (s.title === null || s.title === s.lastTitle) return;
+    s.lastTitle = s.title;
+    try {
+      onTitle(key, s.title);
+    } catch {
+      // onTitle is caller-owned; a throw there must not crash us.
+    }
+  }
+
   // Consumes complete lines out of s.buf (up to the last newline), folding
-  // each qualifying assistant/usage line into the per-message dedupe map.
-  // Returns true iff at least one line updated the map.
+  // each qualifying assistant/usage line into the per-message dedupe map and
+  // tracking the latest session title. Returns which of the two changed --
+  // a bool wouldn't do, since a tick can carry a title and no usage at all.
   function ingestBuffered(s) {
+    const changed = { usage: false, title: false };
     const lastNewline = s.buf.lastIndexOf("\n");
-    if (lastNewline === -1) return false; // no complete line yet this tick
+    if (lastNewline === -1) return changed; // no complete line yet this tick
 
     const complete = s.buf.slice(0, lastNewline + 1);
     s.buf = s.buf.slice(lastNewline + 1);
 
-    let changed = false;
     for (const line of complete.split("\n")) {
       const trimmed = line.trim();
       if (!trimmed) continue;
@@ -154,7 +173,19 @@ export function createEnricher({ config, getTargets, onUsage }) {
       } catch {
         continue; // skip unparseable lines
       }
-      if (!obj || obj.type !== "assistant") continue;
+      if (!obj) continue;
+
+      // §32.4: Claude Code rewrites this line on every rename, so the LAST
+      // one in file order wins -- which this assignment gives us for free,
+      // cumulatively across ticks.
+      if (obj.type === "custom-title") {
+        if (typeof obj.customTitle === "string" && obj.customTitle !== "") {
+          s.title = obj.customTitle;
+          changed.title = true;
+        }
+        continue;
+      }
+      if (obj.type !== "assistant") continue;
 
       const message = obj.message;
       if (!message || !message.usage) continue;
@@ -174,7 +205,7 @@ export function createEnricher({ config, getTargets, onUsage }) {
       // seen so far (cumulative across ticks) -- the "most recent" readout,
       // honest to mid-session model switches, independent of per-id dedupe.
       s.model = message.model;
-      changed = true;
+      changed.usage = true;
     }
     return changed;
   }
@@ -201,6 +232,7 @@ export function createEnricher({ config, getTargets, onUsage }) {
       s.buf = "";
       s.perMessage.clear();
       s.model = null;
+      s.title = null;
     }
 
     if (stat.size === s.offset) return; // nothing new this tick
@@ -222,7 +254,9 @@ export function createEnricher({ config, getTargets, onUsage }) {
       closeSync(fd);
     }
 
-    if (ingestBuffered(s)) reportIfChanged(key, s);
+    const changed = ingestBuffered(s);
+    if (changed.usage) reportIfChanged(key, s);
+    if (changed.title) reportTitleIfChanged(key, s);
   }
 
   function tick() {

@@ -127,7 +127,8 @@
     }
 
     select {
-      width: min(260px, 34vw);
+      /* §32.4: session titles are wordier than the old cwd · id8 label. */
+      width: min(320px, 38vw);
       height: 28px;
       border: 1px solid rgba(35,43,56,.95);
       border-radius: 9px;
@@ -155,6 +156,12 @@
       color: var(--muted);
       cursor: pointer;
       padding: 0;
+    }
+
+    /* An author `display` beats the UA stylesheet's [hidden] rule, so the
+       reset-layout button (§32.3) needs this to actually hide. */
+    .bell[hidden] {
+      display: none;
     }
 
     .bell svg {
@@ -574,9 +581,14 @@
       pointer-events: none;
     }
 
+    /* §32.1: left/top are zeroed and both axes live in the transform, so the
+       JS `layout` map is the single source of position for cards AND links.
+       Do not reintroduce a `left` calc here — cardX() is the only definition
+       of a card's X, breakpoint included. */
     .agent {
       position: absolute;
-      left: calc(52% + var(--indent, 0px));
+      left: 0;
+      top: 0;
       width: 280px;
       min-height: 108px;
       border: 1px solid var(--border);
@@ -585,7 +597,7 @@
       box-shadow: var(--shadow);
       overflow: hidden;
       opacity: 1;
-      transform: translateY(var(--y, 0)) scale(1);
+      transform: translate(var(--x, 0), var(--y, 0));
       transform-origin: left center;
       transition:
         transform 300ms cubic-bezier(.2,.8,.2,1),
@@ -593,7 +605,17 @@
         border-color 220ms ease,
         filter 600ms ease;
       pointer-events: auto;
-      cursor: pointer;
+      cursor: grab;
+      touch-action: none;
+    }
+
+    /* §32.3: the transform transition has to be off mid-drag or the card
+       trails the pointer by 300ms. */
+    .agent.dragging {
+      transition: opacity 600ms ease, border-color 220ms ease, filter 600ms ease;
+      cursor: grabbing;
+      z-index: 5;
+      box-shadow: 0 18px 40px rgba(0,0,0,.5), var(--shadow);
     }
 
     .agent::before {
@@ -1042,11 +1064,11 @@
     @keyframes nodeIn {
       from {
         opacity: 0;
-        transform: translateY(var(--y, 0)) scale(.85);
+        transform: translate(var(--x, 0), var(--y, 0)) scale(.85);
       }
       to {
         opacity: 1;
-        transform: translateY(var(--y, 0)) scale(1);
+        transform: translate(var(--x, 0), var(--y, 0)) scale(1);
       }
     }
 
@@ -1186,10 +1208,6 @@
         left: 34px;
       }
 
-      .agent {
-        left: calc(370px + var(--indent, 0px));
-      }
-
       .empty {
         left: 398px;
         width: 250px;
@@ -1219,6 +1237,12 @@
         <select id="sessionPicker" aria-label="Session">
           <option value="__latest">Follow latest</option>
         </select>
+        <button class="bell" id="resetLayout" type="button" hidden aria-label="Reset card layout" title="Reset card layout">
+          <svg viewBox="0 0 16 16" aria-hidden="true">
+            <path d="M13.2 8a5.2 5.2 0 1 1-1.6-3.75"></path>
+            <path d="M13.4 2.2v3.1h-3.1"></path>
+          </svg>
+        </button>
         <button class="bell" id="notifyToggle" type="button" aria-pressed="false" aria-label="Toggle desktop notifications" title="Notify when a turn finishes">
           <svg viewBox="0 0 16 16" aria-hidden="true">
             <path d="M8 1.6c-2 0-3.5 1.6-3.5 3.6v2.05c0 .62-.24 1.22-.66 1.68l-.78.85a.7.7 0 0 0 .52 1.17h8.84a.7.7 0 0 0 .52-1.17l-.78-.85a2.5 2.5 0 0 1-.66-1.68V5.2c0-2-1.5-3.6-3.5-3.6Z"></path>
@@ -1303,9 +1327,17 @@
   <script>
     (() => {
       const FOLLOW = "__latest";
-      const RHYTHM = 128;
-      const CARD_H = 108;
+      // §32.2: cards are measured, not assumed. CARD_MIN_H mirrors the CSS
+      // min-height and is only the fallback for a node we haven't laid out
+      // yet; CARD_GAP is the breathing room between stacked cards. The old
+      // fixed RHYTHM pitch is gone — it was 128px for cards that measure
+      // 144-179px, which is what made every card overlap its successor.
+      const CARD_MIN_H = 108;
+      const CARD_GAP = 20;
       const HUB_W = 224;
+      const DRAG_THRESHOLD = 4;
+      const POS_KEY = "fleet.cardPos";
+      const POS_SESSION_LIMIT = 20;
       const NARRATIVE_FRESH_MS = 90000;
       const LINEAGE_INDENT = 24;
       const LINEAGE_DEPTH_CAP = 2;
@@ -1329,7 +1361,12 @@
         drawerTarget: null,
         prevTurnActive: new Map(),
         lastSeenErrorAt: new Map(),
-        pendingErrorFlick: new Set()
+        pendingErrorFlick: new Set(),
+        // §32.3: agentId -> {x, y} for cards the user has dragged. Overrides
+        // the auto slot at paint time only — the card keeps its slot in the
+        // stack, so dragging one card never shifts another.
+        manual: new Map(),
+        manualSessionId: null
       };
       const els = {
         layout: document.getElementById("layout"),
@@ -1351,6 +1388,7 @@
         liveDot: document.getElementById("liveDot"),
         liveLabel: document.getElementById("liveLabel"),
         notifyToggle: document.getElementById("notifyToggle"),
+        resetLayout: document.getElementById("resetLayout"),
         rail: document.getElementById("rail"),
         railToggle: document.getElementById("railToggle"),
         railBody: document.getElementById("railBody"),
@@ -1375,6 +1413,50 @@
       };
       const nodes = new Map();
       const paths = new Map();
+      // §32.1: id -> {x, y, h, depth}, rebuilt each render. The ONE place a
+      // card's position lives — renderAgent paints from it and renderPath
+      // anchors to it, so a card and its links can never disagree.
+      const layout = new Map();
+
+      // §32.3 persistence: {[sessionId]: {[agentId]: {x, y}}}, newest-written
+      // sessions kept. Scoped by session so switching sessions in the picker
+      // can't inherit a foreign layout.
+      function readStoredPositions() {
+        try {
+          const raw = JSON.parse(localStorage.getItem(POS_KEY) || "{}");
+          return raw && typeof raw === "object" ? raw : {};
+        } catch {
+          return {};
+        }
+      }
+
+      function loadManual(sessionId) {
+        state.manual.clear();
+        if (!sessionId) return;
+        const entry = readStoredPositions()[sessionId];
+        if (!entry || typeof entry !== "object") return;
+        for (const [id, pos] of Object.entries(entry)) {
+          if (pos && Number.isFinite(pos.x) && Number.isFinite(pos.y)) {
+            state.manual.set(id, { x: pos.x, y: pos.y });
+          }
+        }
+      }
+
+      function persistManual(sessionId) {
+        if (!sessionId) return;
+        try {
+          const all = readStoredPositions();
+          // Delete-then-set, not plain assignment: reassigning an existing key
+          // keeps its original insertion position, which would let the trim
+          // below evict the session we just wrote.
+          delete all[sessionId];
+          if (state.manual.size > 0) all[sessionId] = Object.fromEntries(state.manual);
+          const trimmed = Object.entries(all).slice(-POS_SESSION_LIMIT);
+          localStorage.setItem(POS_KEY, JSON.stringify(Object.fromEntries(trimmed)));
+        } catch {
+          // Private mode / quota — dragging still works, it just won't persist.
+        }
+      }
 
       function parseTime(value) {
         const n = Date.parse(value || "");
@@ -2017,13 +2099,50 @@
         renderAll();
       }
 
+      // §32.4: a session is named by its own title once the enricher has read
+      // one out of the transcript, falling back to today's cwd · id8 while it
+      // hasn't (blank-until-known, per §31.2's rule for model). Titles aren't
+      // unique — two live sessions really can share one — so a title that
+      // collides with another *visible* session's earns an id suffix, and
+      // only then.
+      function sessionLabel(session, ambiguous) {
+        if (!session.title) return `${basename(session.cwd)} · ${String(session.id).slice(0, 8)}`;
+        const mode = ambiguous.get(session.title);
+        if (!mode) return session.title;
+        return `${session.title} · ${mode === "full" ? session.id : String(session.id).slice(0, 8)}`;
+      }
+
+      // Titles that more than one visible session claims, mapped to how much
+      // of the id it takes to tell them apart. Claude session ids are UUIDs so
+      // 8 chars is always enough; ids that share a prefix (a codex "codex:x"
+      // namespace, say) fall back to the whole thing rather than rendering two
+      // identical options.
+      function ambiguousTitles(sessions) {
+        const byTitle = new Map();
+        for (const session of sessions) {
+          if (!session.title) continue;
+          if (!byTitle.has(session.title)) byTitle.set(session.title, []);
+          byTitle.get(session.title).push(String(session.id));
+        }
+        const ambiguous = new Map();
+        for (const [title, ids] of byTitle) {
+          if (ids.length < 2) continue;
+          const shortEnough = new Set(ids.map(id => id.slice(0, 8))).size === ids.length;
+          ambiguous.set(title, shortEnough ? "short" : "full");
+        }
+        return ambiguous;
+      }
+
       function renderPicker() {
         const sessions = sortedSessions();
         const previous = state.selected;
+        const ambiguous = ambiguousTitles(sessions);
         els.picker.replaceChildren(new Option("Follow latest", FOLLOW));
         for (const session of sessions) {
-          const label = `${basename(session.cwd)} · ${String(session.id).slice(0, 8)}`;
-          els.picker.add(new Option(label, session.id));
+          const label = sessionLabel(session, ambiguous);
+          const option = new Option(label, session.id);
+          option.title = label; // the select is width-capped; full text on hover
+          els.picker.add(option);
         }
         els.picker.value = sessions.some(s => s.id === previous) ? previous : FOLLOW;
       }
@@ -2121,7 +2240,14 @@
             <div class="files-row"><\/div>
           <\/div>
         `;
-        node.addEventListener("click", () => openDrawer({ kind: "agent", id: node.dataset.id }));
+        node.addEventListener("click", () => {
+          // §32.3: a drag always ends in a click; swallow exactly that one.
+          if (node.dataset.dragged) {
+            delete node.dataset.dragged;
+            return;
+          }
+          openDrawer({ kind: "agent", id: node.dataset.id });
+        });
         els.agents.append(node);
         nodes.set(agent.id, node);
         setTimeout(() => node.classList.remove("enter"), 280);
@@ -2140,13 +2266,12 @@
         return path;
       }
 
-      function renderAgent(node, agent, index, total, startY, plan, collisions, depth) {
-        const y = startY + index * RHYTHM;
+      // §32.2: content only — no positioning. Runs before heights are read so
+      // the layout pass measures a card that already holds its final content.
+      function renderAgentContent(node, agent, index, total, plan, collisions) {
         const isDone = agent.status === "done";
         const doneAge = agent.endedAt ? Date.now() - parseTime(agent.endedAt) : 0;
-        node.style.setProperty("--y", `${y}px`);
         node.style.setProperty("--accent", accent(agent));
-        node.style.setProperty("--indent", `${indentPx(depth)}px`);
         node.classList.toggle("dim", isDone && doneAge > 20000);
         node.classList.toggle("fade", isDone && doneAge > 180000);
         node.querySelector(".agent-label").textContent = agent.label || agent.agentType || "Agent";
@@ -2198,18 +2323,63 @@
         return base + indentPx(depth);
       }
 
-      function renderPath(path, agent, index, startY, depth, parentInfo) {
-        const stageBox = els.stage.getBoundingClientRect();
-        const compact = window.matchMedia("(max-width: 760px)").matches;
-        const cardLeft = cardX(compact, stageBox.width, depth);
-        const cardY = startY + index * RHYTHM + CARD_H / 2;
+      function isCompact() {
+        return window.matchMedia("(max-width: 760px)").matches;
+      }
+
+      // §32.2: measure, then stack. Every card gets an auto slot (cumulative
+      // height + gap, the whole column centred); a manual §32.3 position
+      // overrides only where the card is painted, never its slot — which is
+      // why dragging one card leaves every other card where it was.
+      function computeLayout(agents, depthOf, stageBox, compact) {
+        layout.clear();
+        const heights = agents.map(agent => {
+          const node = nodes.get(agent.id);
+          return Math.max(CARD_MIN_H, node ? node.offsetHeight : CARD_MIN_H);
+        });
+        const stackH = heights.reduce((sum, h) => sum + h, 0) +
+          CARD_GAP * Math.max(0, agents.length - 1);
+
+        let lowest = 0;
+        for (const pos of state.manual.values()) lowest = Math.max(lowest, pos.y + CARD_MIN_H);
+        const minHeight = Math.max(620, stackH + 220, lowest + 120);
+        els.stage.style.setProperty("--stage-h", `${minHeight}px`);
+
+        let y = Math.max(110, (minHeight - stackH) / 2);
+        agents.forEach((agent, index) => {
+          const depth = depthOf.get(agent.id) || 0;
+          const auto = { x: cardX(compact, stageBox.width, depth), y };
+          const manual = state.manual.get(agent.id);
+          layout.set(agent.id, {
+            x: manual ? manual.x : auto.x,
+            y: manual ? manual.y : auto.y,
+            h: heights[index],
+            depth
+          });
+          y += heights[index] + CARD_GAP;
+        });
+      }
+
+      function applyLayout(node, pos) {
+        node.style.setProperty("--x", `${pos.x}px`);
+        node.style.setProperty("--y", `${pos.y}px`);
+      }
+
+      function renderPath(path, agent, stageBox, compact, parentId) {
+        const pos = layout.get(agent.id);
+        if (!pos) return;
+        const cardLeft = pos.x;
+        // §32.1: the measured centre, not CARD_H/2 — links used to meet tall
+        // cards above their true middle.
+        const cardY = pos.y + pos.h / 2;
         let srcX, srcY, mid;
-        if (parentInfo) {
+        const parentPos = parentId ? layout.get(parentId) : null;
+        if (parentPos) {
           // §24: source at the parent card's left edge instead of the hub,
           // bowing left so a parent→child link reads distinctly from the
           // shallower hub→card sweep.
-          srcX = cardX(compact, stageBox.width, parentInfo.depth);
-          srcY = startY + parentInfo.index * RHYTHM + CARD_H / 2;
+          srcX = parentPos.x;
+          srcY = parentPos.y + parentPos.h / 2;
           mid = Math.min(srcX, cardLeft) - 36;
         } else {
           srcX = (compact ? 34 : stageBox.width * .08) + HUB_W;
@@ -2247,31 +2417,62 @@
       function renderAll() {
         renderPicker();
         const session = activeSession();
+        // §32.3: manual positions are per-session, so follow the active
+        // session (which moves on its own in "Follow latest" mode).
+        const sessionId = session ? session.id : null;
+        if (sessionId !== state.manualSessionId) {
+          state.manualSessionId = sessionId;
+          loadManual(sessionId);
+        }
         const baseAgents = selectedAgents(session);
         const { agents, depthOf, parentOf } = lineageOrder(baseAgents);
         const plan = currentPlan(session);
         const collisions = computeCollisions(agents);
         renderRail(session);
-        const minHeight = Math.max(620, agents.length * RHYTHM + 220);
-        els.stage.style.setProperty("--stage-h", `${minHeight}px`);
         renderChrome(session, agents, collisions);
-        const startY = Math.max(110, (minHeight - ((agents.length - 1) * RHYTHM + CARD_H)) / 2);
-        const indexOf = new Map(agents.map((agent, i) => [agent.id, i]));
+
+        // §32.2: content first, so every card holds its final content before
+        // anything measures it; then one layout pass; then paint.
         const visibleIds = new Set();
         agents.forEach((agent, index) => {
           visibleIds.add(agent.id);
-          const node = ensureNode(agent);
-          const path = ensurePath(agent);
-          const depth = depthOf.get(agent.id) || 0;
-          renderAgent(node, agent, index, agents.length, startY, plan, collisions, depth);
+          renderAgentContent(ensureNode(agent), agent, index, agents.length, plan, collisions);
+        });
+
+        const compact = isCompact();
+        computeLayout(agents, depthOf, els.stage.getBoundingClientRect(), compact);
+        // Re-read after computeLayout set --stage-h: the hub link anchors to
+        // the stage's vertical centre, which just moved.
+        const stageBox = els.stage.getBoundingClientRect();
+
+        agents.forEach(agent => {
+          const pos = layout.get(agent.id);
+          applyLayout(nodes.get(agent.id), pos);
           const parent = parentOf.get(agent.id);
-          const parentInfo = parent
-            ? { index: indexOf.get(parent.id), depth: depthOf.get(parent.id) || 0 }
-            : null;
-          renderPath(path, agent, index, startY, depth, parentInfo);
+          renderPath(ensurePath(agent), agent, stageBox, compact, parent ? parent.id : null);
         });
         removeMissing(visibleIds);
         state.visible = visibleIds;
+        renderResetLayout();
+      }
+
+      // §32.3: repaint positions and links without touching content — the
+      // per-pointermove path. Content rendering and height measurement are
+      // skipped entirely; only the dragged card's layout entry has changed.
+      function repositionAll() {
+        const session = activeSession();
+        const { agents, parentOf } = lineageOrder(selectedAgents(session));
+        const compact = isCompact();
+        const stageBox = els.stage.getBoundingClientRect();
+        for (const agent of agents) {
+          const pos = layout.get(agent.id);
+          const node = nodes.get(agent.id);
+          if (!pos || !node) continue;
+          applyLayout(node, pos);
+          const path = paths.get(agent.id);
+          const parent = parentOf.get(agent.id);
+          if (path) renderPath(path, agent, stageBox, compact, parent ? parent.id : null);
+        }
       }
 
       function tickTimers() {
@@ -2315,6 +2516,83 @@
           if (msg) applyFleet(msg);
         });
       }
+
+      // ——— §32.3 card dragging ————————————————————————————————————————
+      const drag = { id: null, node: null, pointerId: null, startX: 0, startY: 0, originX: 0, originY: 0, moved: false };
+
+      function clampToStage(x, y, h) {
+        const box = els.stage.getBoundingClientRect();
+        return {
+          x: Math.min(Math.max(8, x), Math.max(8, box.width - 280 - 8)),
+          y: Math.min(Math.max(8, y), Math.max(8, box.height - h - 8))
+        };
+      }
+
+      els.agents.addEventListener("pointerdown", event => {
+        if (event.button !== 0) return;
+        const node = event.target.closest(".agent");
+        if (!node) return;
+        const pos = layout.get(node.dataset.id);
+        if (!pos) return;
+        drag.id = node.dataset.id;
+        drag.node = node;
+        drag.pointerId = event.pointerId;
+        drag.startX = event.clientX;
+        drag.startY = event.clientY;
+        drag.originX = pos.x;
+        drag.originY = pos.y;
+        drag.moved = false;
+        // Throws if the pointer isn't active (stale id, synthetic event) —
+        // the drag still works via the bubbled listeners, just without capture.
+        try { node.setPointerCapture(event.pointerId); } catch {}
+      });
+
+      els.agents.addEventListener("pointermove", event => {
+        if (drag.id === null || event.pointerId !== drag.pointerId) return;
+        const dx = event.clientX - drag.startX;
+        const dy = event.clientY - drag.startY;
+        if (!drag.moved) {
+          if (Math.hypot(dx, dy) < DRAG_THRESHOLD) return;
+          drag.moved = true;
+          drag.node.classList.add("dragging");
+        }
+        const pos = layout.get(drag.id);
+        if (!pos) return;
+        const next = clampToStage(drag.originX + dx, drag.originY + dy, pos.h);
+        state.manual.set(drag.id, next);
+        pos.x = next.x;
+        pos.y = next.y;
+        repositionAll();
+      });
+
+      function endDrag(event) {
+        if (drag.id === null || event.pointerId !== drag.pointerId) return;
+        if (drag.moved) {
+          drag.node.classList.remove("dragging");
+          // Consumed and cleared by the card's click handler, so the click
+          // that always follows a drag doesn't also open the drawer.
+          drag.node.dataset.dragged = "1";
+          persistManual(state.manualSessionId);
+          renderResetLayout();
+        }
+        try { drag.node.releasePointerCapture(drag.pointerId); } catch {}
+        drag.id = null;
+        drag.node = null;
+        drag.pointerId = null;
+      }
+
+      els.agents.addEventListener("pointerup", endDrag);
+      els.agents.addEventListener("pointercancel", endDrag);
+
+      function renderResetLayout() {
+        els.resetLayout.hidden = state.manual.size === 0;
+      }
+
+      els.resetLayout.addEventListener("click", () => {
+        state.manual.clear();
+        persistManual(state.manualSessionId);
+        renderAll();
+      });
 
       els.picker.addEventListener("change", event => {
         state.selected = event.target.value;

@@ -360,3 +360,143 @@ describe("server/enrich.mjs — tolerance and lifecycle", () => {
     assert.equal(calls.length, 0);
   });
 });
+
+// --- §32.4 session titles ---------------------------------------------------
+// Claude Code writes the session's name into the same transcript the enricher
+// already tails, as a `custom-title` line rewritten on every rename. These
+// cover the two things that make it awkward: last-one-wins, and the fact that
+// a tick can carry a title with no usage at all (which the old bool return
+// from ingestBuffered would have swallowed).
+
+function makeTitleEnricher(targetsFn) {
+  const usage = [];
+  const titles = [];
+  const enricher = createEnricher({
+    config: { enrichment: { pricing: PRICING } },
+    getTargets: targetsFn,
+    onUsage: (key, tokens, costUsd, model) => usage.push({ key, tokens, costUsd, model }),
+    onTitle: (key, title) => titles.push({ key, title }),
+  });
+  return { enricher, usage, titles };
+}
+
+const ASSISTANT_LINE = JSON.stringify({
+  type: "assistant",
+  message: {
+    id: "msg-title-1",
+    model: "claude-opus-4-8",
+    usage: {
+      input_tokens: 10,
+      output_tokens: 20,
+      cache_read_input_tokens: 0,
+      cache_creation_input_tokens: 0,
+    },
+  },
+});
+
+const titleLine = (customTitle, sessionId = "s1") =>
+  JSON.stringify({ type: "custom-title", customTitle, sessionId });
+
+describe("server/enrich.mjs — session titles (§32.4)", () => {
+  test("the LAST custom-title in the file wins, not the first", () => {
+    const path = join(makeScratchDir(), "renamed.jsonl");
+    writeFileSync(
+      path,
+      [titleLine("First name"), ASSISTANT_LINE, titleLine("Second name"), titleLine("Final name")].join("\n") + "\n"
+    );
+    const { enricher, titles } = makeTitleEnricher(() => [{ key: "session:s1", path }]);
+
+    enricher.tick();
+
+    assert.deepEqual(titles, [{ key: "session:s1", title: "Final name" }]);
+  });
+
+  test("a tick with a title but no usage still reports", () => {
+    const path = join(makeScratchDir(), "title-only.jsonl");
+    writeFileSync(path, titleLine("Delegated otter plan") + "\n");
+    const { enricher, usage, titles } = makeTitleEnricher(() => [{ key: "session:s1", path }]);
+
+    enricher.tick();
+
+    assert.equal(usage.length, 0, "no assistant lines -> no usage report");
+    assert.deepEqual(titles, [{ key: "session:s1", title: "Delegated otter plan" }]);
+  });
+
+  test("an unchanged title is not re-reported; a rename is", () => {
+    const path = join(makeScratchDir(), "stable.jsonl");
+    writeFileSync(path, titleLine("Stable name") + "\n");
+    const { enricher, titles } = makeTitleEnricher(() => [{ key: "session:s1", path }]);
+
+    enricher.tick();
+    appendFileSync(path, titleLine("Stable name") + "\n");
+    enricher.tick();
+    assert.equal(titles.length, 1, "same title again -> no second report");
+
+    appendFileSync(path, titleLine("Renamed") + "\n");
+    enricher.tick();
+    assert.deepEqual(titles.at(-1), { key: "session:s1", title: "Renamed" });
+    assert.equal(titles.length, 2);
+  });
+
+  test("a blank or non-string customTitle is ignored", () => {
+    const path = join(makeScratchDir(), "junk-title.jsonl");
+    writeFileSync(
+      path,
+      [
+        titleLine(""),
+        JSON.stringify({ type: "custom-title", customTitle: null, sessionId: "s1" }),
+        JSON.stringify({ type: "custom-title", sessionId: "s1" }),
+      ].join("\n") + "\n"
+    );
+    const { enricher, titles } = makeTitleEnricher(() => [{ key: "session:s1", path }]);
+
+    enricher.tick();
+
+    assert.equal(titles.length, 0);
+  });
+
+  test("truncation clears the title without clearing a known one downstream", () => {
+    const path = join(makeScratchDir(), "rotated.jsonl");
+    writeFileSync(path, [titleLine("Before rotation"), ASSISTANT_LINE].join("\n") + "\n");
+    const { enricher, titles } = makeTitleEnricher(() => [{ key: "session:s1", path }]);
+
+    enricher.tick();
+    assert.deepEqual(titles.at(-1), { key: "session:s1", title: "Before rotation" });
+
+    // Shrink the file -- the enricher rebuilds this path's state from scratch.
+    writeFileSync(path, titleLine("After rotation") + "\n");
+    enricher.tick();
+
+    assert.deepEqual(titles.at(-1), { key: "session:s1", title: "After rotation" });
+  });
+
+  test("an enricher built without onTitle still drives onUsage unchanged", () => {
+    const path = join(makeScratchDir(), "no-callback.jsonl");
+    writeFileSync(path, [titleLine("Ignored"), ASSISTANT_LINE].join("\n") + "\n");
+    const calls = [];
+    const enricher = createEnricher({
+      config: { enrichment: { pricing: PRICING } },
+      getTargets: () => [{ key: "session:s1", path }],
+      onUsage: (key, tokens) => calls.push({ key, tokens }),
+    });
+
+    assert.doesNotThrow(() => enricher.tick());
+    assert.equal(calls.length, 1);
+    assert.equal(calls[0].tokens.out, 20);
+  });
+
+  test("onTitle throwing is tolerated -- no throw", () => {
+    const path = join(makeScratchDir(), "throwing.jsonl");
+    writeFileSync(path, titleLine("Boom") + "\n");
+    const enricher = createEnricher({
+      config: { enrichment: { pricing: PRICING } },
+      getTargets: () => [{ key: "session:s1", path }],
+      onUsage: () => {},
+      onTitle: () => {
+        throw new Error("caller-owned callback exploded");
+      },
+    });
+
+    assert.doesNotThrow(() => enricher.tick());
+  });
+});

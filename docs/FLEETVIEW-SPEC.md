@@ -1480,3 +1480,155 @@ timeline is untouched (stall guard).
    acceptance deliverable, never committed — may leak private paths).
 7. README hero = demo-canvas PNG at `docs/media/fleetview.png`
    (committed, captured from the demo — never from the real session).
+
+---
+
+# FleetView v6 — amendment (2026-07-20)
+
+## 32. Canvas layout, card dragging, session titles (amends §11, §12, §13, §19.3)
+
+Three polish items, two of which share one refactor.
+
+Problem A — **cards overlap**. Card Y has always been `startY + index *
+RHYTHM` with `RHYTHM = 128`, while `.agent` is `min-height: 108px` with
+no max. Measured against the demo fleet, real cards run **144–179px**:
+every card overlaps its successor by 16–51px, and the taller the card
+(chips row + a two-line note) the worse it gets. This is a
+fixed-pitch-vs-variable-height bug, not a placement bug — no amount of
+manual dragging fixes it, because the next spawn re-overlaps.
+
+Problem B — **positions are not the user's to choose**. There is no way
+to pull a card out of the column.
+
+Problem C — **the picker names sessions by UUID**. `lumenADE · 7914195e`
+tells you nothing; the session's real name is "Delegated otter plan".
+
+### 32.1 One position source (amends §13)
+
+Today a card's position is expressed four times — CSS `left: calc(52% +
+var(--indent))`, the mobile override `left: calc(370px + …)`, JS
+`cardX()`, and JS `startY + index * RHYTHM` — and the connector
+re-derives all of it independently. They agree only because the numbers
+were kept in sync by hand.
+
+Replace all four with a single per-render `layout` Map, `id -> {x, y, h,
+depth}`, that **both** `renderAgent` and `renderPath` read. Consequences:
+
+- `.agent` becomes `left: 0; top: 0; transform: translate(var(--x),
+  var(--y))`; JS owns both axes. The `@media (max-width: 760px)`
+  `.agent` override and `--indent` are deleted — `cardX()` already
+  mirrors the breakpoint and is now the only definition.
+- `@keyframes nodeIn` tracks `var(--x)` as well as `var(--y)`.
+- `renderPath` takes the hoisted `stageBox`/`compact` instead of calling
+  `getBoundingClientRect()` once per agent (N reflows per render → 1).
+- Connector attach points become `y + h / 2` from the measured height,
+  retiring the `CARD_H / 2` assumption that made links meet tall cards
+  above their true centre.
+
+### 32.2 Content-aware stacking (amends §13)
+
+`renderAll` splits into content-then-layout so heights can be measured:
+
+1. `renderAgentContent` writes every node's content (no positioning).
+2. Heights are read once per card (`offsetHeight`, falling back to
+   `CARD_MIN_H` for a not-yet-laid-out node).
+3. Auto Y is cumulative — `y[i] = y[i-1] + h[i-1] + CARD_GAP` — seeded
+   at a `startY` that centres the measured stack, replacing
+   `index * RHYTHM`. `--stage-h` grows from the measured stack, not
+   `agents.length * RHYTHM`.
+
+`RHYTHM` is retired. `CARD_H` survives only as `CARD_MIN_H` (108, the
+measurement fallback and the CSS `min-height`). New `CARD_GAP = 20`.
+
+Ordering and indent are unchanged: §24 lineage order still decides the
+sequence, `indentPx(depth)` still the X offset.
+
+### 32.3 Card dragging (amends §13)
+
+Pointer drag on `.agent`, with `setPointerCapture` so a fast drag cannot
+escape the node.
+
+- **Manual overrides, never reflows.** A dragged card records
+  `{x, y}` in `state.manual`; the layout pass computes an auto slot for
+  *every* card regardless and lets a manual entry win at paint time.
+  A card keeps its auto slot even while dragged elsewhere, so **moving
+  one card never moves another** — the alternative (dropping dragged
+  cards out of the stack) would re-centre the column under the user's
+  hands on every drag.
+- **Live connectors.** A drag repaints its own transform and *all*
+  paths, so a parent dragged away keeps its children's links attached
+  (the §32.1 shared source is what makes this a two-line change).
+- **Click is preserved.** Movement under `DRAG_THRESHOLD` (4px) is a
+  click and still opens the drawer; past it the card sets
+  `dataset.dragged`, which the click handler consumes and clears. Cards
+  are `cursor: grab` / `.dragging { cursor: grabbing; transition: none;
+  z-index: 5 }` — the 300ms transform transition must be off during a
+  drag or the card lags the pointer.
+- **Bounds.** Positions clamp to the stage box (8px margin) so a card
+  cannot be thrown out of the scroll area; `--stage-h` accounts for
+  manual positions so dragging downward grows the canvas.
+- **Persistence.** `localStorage["fleet.cardPos"]` =
+  `{[sessionId]: {[agentId]: {x, y}}}`, trimmed to the 20
+  most-recently-written sessions. Keyed by session so switching
+  sessions cannot inherit a foreign layout. Follows the existing
+  `fleet.*` key convention (§13's `fleet.railCollapsed`,
+  `fleet.notify`).
+- **Reset.** A topbar control, rendered only when the active session has
+  manual positions, clears them for that session and re-renders.
+
+### 32.4 `Session.title` (amends §11 state, §12, §19.3)
+
+New field `title` (string | null, default null). Claude Code writes its
+session name into the transcript the server already tails, as a
+`{"type": "custom-title", "customTitle": …, "sessionId": …}` line. The
+line is **rewritten on every rename** (30 copies in one observed
+transcript), so the reader takes the **last** occurrence, not the first.
+
+- **Enricher** (`server/enrich.mjs`) gains an optional `onTitle(key,
+  title)` callback. `ingestBuffered` returns `{usage, title}` instead of
+  a bool so a tick containing only `custom-title` lines still reports —
+  the existing `if (ingestBuffered(s)) reportIfChanged(…)` gate would
+  otherwise swallow it. Title state resets with the rest on truncation.
+  `onUsage`'s signature is untouched; `onTitle` is optional, so an
+  enricher constructed without it behaves exactly as before.
+- The enricher reads from **offset 0** on first sight of a file
+  (§19.3), so a title set before FleetView started is still picked up.
+- **Server** applies it on the session branch only (`session:<id>`
+  keys). Agent transcripts have no `custom-title` and agent naming
+  stays with spawn payloads / §22 discovery — the enricher must not
+  fight `resolveAgentMeta` (same rule as `model`, §31.2). Setting a
+  title does not bump `lastActivityAt`. Broadcast is the existing
+  `{type: "session", session}` upsert; additive snapshot field, `v`
+  stays 1.
+- **Picker** (§13) renders `session.title` when known, else today's
+  `<cwd basename> · <id8>`. Titles are not unique — two live sessions
+  can share one — so a title colliding with another *visible* session's
+  gets ` · <id8>` appended, and only then. Each option carries its full
+  label as a `title` attribute, since the select is width-capped.
+- Blank-until-known, exactly as §31.2's model: never a guessed title,
+  and `enrichment.enabled: false` degrades cleanly to the old label. A
+  session idle beyond §19.3's 10-minute enrichment window keeps
+  whatever title it last had.
+
+### 32.5 v6 acceptance criteria
+
+1. Spec-first: this section lands before any code.
+2. `node --check` every changed `.mjs`; `npm test` green, count > 160,
+   no regression; untouched suites pass unmodified.
+3. Enricher: last `custom-title` wins over earlier ones; a title-only
+   tick reports; a tick with neither usage nor title reports nothing;
+   truncation clears the title; an enricher built without `onTitle`
+   still drives `onUsage` unchanged.
+4. Server: `session.title` set from a real transcript within one tick
+   and delivered over SSE; agent-keyed titles ignored;
+   `lastActivityAt` unchanged by a title.
+5. Layout: with the demo fleet loaded, **no card's box intersects
+   another's** — the measured regression that motivated this section.
+   Connectors meet cards at their true vertical centre.
+6. Drag: a dragged card follows the pointer, its links and its
+   children's links stay attached, a <4px press still opens the drawer,
+   the position survives reload, and reset restores the auto stack.
+7. Greps: `RHYTHM` has zero *code* references in `public/index.html` (it
+   survives only in the comment recording why the fixed pitch went away,
+   so a future grep for it lands on the explanation); zero external URLs
+   (§16.5/§29.8 guard) still holds.
