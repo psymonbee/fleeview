@@ -279,6 +279,7 @@ function getOrCreateSession(sessionId, t, cwd) {
       tokens: null,
       costUsd: null,
       model: null, // §31.2
+      title: null, // §32.4
       currentActivity: null, // §25
       capabilities: [], // §26
     };
@@ -1094,12 +1095,25 @@ function onEnrichmentUsage(key, tokens, costUsd, model) {
   }
 }
 
+// §32.4: the session's own name, read out of the transcript we already tail.
+// Session-scoped only -- agent transcripts carry no custom-title, and agent
+// naming stays with spawn payloads / §22 discovery meta for the same reason
+// the model does. Like usage, this never touches lastActivityAt.
+function onEnrichmentTitle(key, title) {
+  if (!key.startsWith("session:")) return;
+  const session = sessions.get(key.slice("session:".length));
+  if (!session || session.title === title) return;
+  session.title = title;
+  broadcast({ type: "session", session });
+}
+
 let enricher = null;
 if (config.enrichment && config.enrichment.enabled) {
   enricher = createEnricher({
     config,
     getTargets: getEnrichmentTargets,
     onUsage: onEnrichmentUsage,
+    onTitle: onEnrichmentTitle,
   });
 }
 if (enricher) {
