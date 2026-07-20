@@ -37,7 +37,32 @@ scripts/demo.mjs          pre-plan activity, nested demo-n1 under demo-b1,
 Spec §22–§29 is the v4 contract; **amend the spec before changing any
 schema/SSE/UI shape** — unchanged rule. `npm test` = bare `node --test`.
 
-## Two scoped workstreams — START HERE (added 2026-07-19)
+## Where v5 stands (updated 2026-07-20)
+
+Both scoped workstreams below are **shipped**:
+
+1. **Codex capture** — landed 2026-07-19 via user-level `~/.codex/config.toml`
+   hooks (spec §18.4–§18.6, PRs #7/#8, 153 tests at the time).
+2. **Orchestrator card + live session model** — landed 2026-07-20 as spec
+   **§31** (PR #9, branch `v5/orchestrator-card`, 160 tests): the hub is the
+   session's own card (CARD_H, capability chips row, click-through session
+   drawer with `session-activity` SSE live-append); fuzzy main-loop
+   spawn-pendings synthesize a `delegate` activity instead of clearing the
+   readout (supersedes §25's clear — the reducer-v4 test flipped with it);
+   `Session.model` flows from the enricher (4-arg `onUsage`, most-recent
+   qualifying line, never clears) and from `agent.usage`'s additive `model?`.
+   Real-session proof passed: a read-only server on the live events file
+   painted `Claude Fable 5 · lumenADE` within one enricher tick. Codex
+   session model explicitly out of scope (§31.2).
+
+**Deferred by owner (2026-07-20): all screenshots/video/hero media** — a
+branding + polish pass is planned; README's hero line is untouched until
+then (§31.6.7 outstanding). Built with the fleet pattern: 4 parallel
+builders on disjoint files; the checker agent stalled mid-run and was
+stopped — orchestrator verified inline instead (suite, greps, reducer read,
+live demo, degradation, real session).
+
+## Two scoped workstreams — SHIPPED (see above)
 
 Both have their own bootstrap with the probe work already done. Read the one
 you are picking up **instead of** re-deriving from this file:
@@ -91,12 +116,12 @@ account: real vendored install, absolute interpreter, live events.
   captures as part of the §18 rewrite.
 - **Events-file rotation** — the log grows unbounded; v4 added ~1 line per
   main-loop tool call (README documents truncate-any-time).
-- **Session-level capabilities UI** — the reducer collects
-  `Session.capabilities` (§26) but nothing renders it yet; a hub-adjacent
-  chip row is the obvious slot.
-- Smaller nits: `.hub` height went 72→88px for the activity line (revisit if
-  hub layout evolves); narrator sidecar still off by default and unexercised
-  in v4.
+- ~~Session-level capabilities UI~~ — **shipped in v5** (§31.4 hub chips
+  row).
+- Smaller nits: `.hub` height is now 108px = CARD_H (§31.4; was 72→88 in
+  v4); hub subtitle can ellipsize when model + cwd + token badge compete for
+  224px — candidate for the branding pass; narrator sidecar still off by
+  default and unexercised.
 - **AI-composed card content (v6/v7)** — design note in
   `docs/COMPOSABLE-CARDS.md`: Haiku reads the initial prompt/plan once and
   emits palette-constrained layout hints per agentType; UI composes cards

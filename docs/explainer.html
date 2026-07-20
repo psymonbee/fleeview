@@ -225,7 +225,7 @@
     <h2>Reading the screen</h2>
     <p>Everything on the canvas answers one question at a glance: <em>is my fleet healthy?</em></p>
     <div class="grid">
-      <div class="cell"><h3><span class="dot orange"></span>The hub</h3><p>The orchestrator — the "manager" Claude that hires everyone else. It glows softly while a conversation turn is in progress.</p></div>
+      <div class="cell"><h3><span class="dot orange"></span>The hub</h3><p>The orchestrator — the "manager" Claude that hires everyone else. It glows softly while a conversation turn is in progress. Since v5 it's a full card in its own right: it names the model running the show, narrates what the manager is doing, wears its own skill/tool badges, and opens its own drawer when clicked.</p></div>
       <div class="cell"><h3><span class="dot orange"></span>Agent cards</h3><p>One card per helper: its name, which AI model it runs on (Claude or OpenAI, colour-coded), what it was hired to do, and a live one-line status with a ticking clock.</p></div>
       <div class="cell"><h3><span class="dot teal"></span>Plan rail <em>(new)</em></h3><p>The checklist down the left side. When the orchestrator writes itself a task list, each step appears here — grey waiting, pulsing in progress, ✓ done. Cards get a little S1/S2 tag showing which step they're working.</p></div>
       <div class="cell"><h3><span class="dot teal"></span>File chips <em>(new)</em></h3><p>Small tags on each card naming the files that agent has touched. If two running agents grab the <em>same</em> file, both chips pulse amber and a warning appears — your early smoke alarm for agents treading on each other.</p></div>
@@ -306,6 +306,21 @@
       <span class="pill"><span class="dot green"></span>v3 · built &amp; shipped 17 July</span>
       <span class="pill"><span class="dot green"></span>v4 · built &amp; shipped 17 July</span>
       <span class="pill"><span class="dot teal"></span>v5 · ideas parked</span>
+    </div>
+  </section>
+
+  <!-- ─────────────────────────── SLIDE 8 ─────────────────────────── -->
+  <section class="slide">
+    <p class="eyebrow">Slide 8 · v5</p>
+    <h2>The manager gets a card of its own</h2>
+    <p><strong>The itch:</strong> the screen looked dead until the first helper was hired — and worse, the moment the manager delegated anything, its own one-line readout was wiped, on the theory that "the fleet takes over the story". Real sessions proved that theory wrong: the manager keeps working the whole time the fleet runs. Most of a session's actual work — reading, searching, running commands, using skills and outside tools — <em>is</em> the manager's work, and FleetView was hiding it.</p>
+    <p><strong>Now:</strong> the hub is the session's own card, same size as everyone else's. It's alive from the moment you hit send. When the manager hires someone, the readout now says <em>delegate: build the SSE server</em> instead of going blank — the moment of delegation became a visible beat in the story rather than a blackout. The card wears the same skill/tool badges the agents get, and clicking it slides out the same drawer, showing the manager's own activity log, live.</p>
+    <p><strong>And it names names:</strong> FleetView now reads which model is actually running the show — straight off the session's own transcript, on your Mac, updating within seconds — and prints it on the hub. Not a setting, not a guess: during this very build, the canvas named the model doing the building the moment its first accounting tick ran.</p>
+    <p><strong>The build was its own demo:</strong> v5 was built fleet-style — four builders in parallel, watched live on FleetView itself. One genuinely satisfying moment: the checking agent went silent mid-run, and its card turned amber and said "stalled" — the product flagged its own build tooling misbehaving, which is precisely the job it was built to do. 160 automated checks green (up from 153).</p>
+    <p><strong>Honest edges:</strong> Codex-run sessions don't name their model yet (written into the contract as out of scope, not half-wired), and screenshots, video and the README's hero image are deliberately waiting on a branding-and-polish pass.</p>
+    <div class="pills">
+      <span class="pill"><span class="dot green"></span>v5 · built &amp; shipped 20 July</span>
+      <span class="pill"><span class="dot teal"></span>next · branding &amp; polish pass</span>
     </div>
   </section>
 
