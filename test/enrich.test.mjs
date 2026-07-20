@@ -35,7 +35,7 @@ function makeEnricher(targetsFn, pricing = PRICING) {
   const enricher = createEnricher({
     config: { enrichment: { pricing } },
     getTargets: targetsFn,
-    onUsage: (key, tokens, costUsd) => calls.push({ key, tokens, costUsd }),
+    onUsage: (key, tokens, costUsd, model) => calls.push({ key, tokens, costUsd, model }),
   });
   return { enricher, calls };
 }
@@ -67,6 +67,13 @@ describe("server/enrich.mjs — dedupe + cost math", () => {
     // model id "claude-opus-4-8-20260201" prefix-matches "claude-opus-4-8".
     assert.deepEqual(tokens, { in: 152, out: 597, cacheRead: 10500, cacheWrite: 23956 });
     closeTo(costUsd, 0.16296);
+
+    // The fixture switches models mid-session: msg_1 (claude-opus-4-8) ->
+    // msg_2 (claude-sonnet-5) -> msg_synth (dropped) -> msg_3
+    // (claude-opus-4-8-20260201, the last qualifying line in file order).
+    // "Most recent" wins, reported as the RAW id -- prettification is the
+    // server's job, not the enricher's.
+    assert.equal(calls[0].model, "claude-opus-4-8-20260201");
   });
 
   test("costUsd stays null when no message's model matched any pricing entry", () => {
@@ -91,6 +98,10 @@ describe("server/enrich.mjs — dedupe + cost math", () => {
     assert.deepEqual(calls[0].tokens, { in: 1999, out: 1499, cacheRead: 0, cacheWrite: 0 });
     // Only msg_a contributes: (1000/1e6)*3 + (500/1e6)*15
     closeTo(calls[0].costUsd, 0.0105);
+    // msg_b (the unpriced "totally-unpriced-model") is the last qualifying
+    // line -- a model with no pricing entry is still reported as the model
+    // arg; pricing coverage and model reporting are independent.
+    assert.equal(calls[0].model, "totally-unpriced-model");
   });
 });
 
@@ -177,6 +188,54 @@ describe("server/enrich.mjs — incremental reads", () => {
 
       assert.equal(calls.length, 1, "exactly one report once the line completes -- no double count");
       assert.deepEqual(calls[0].tokens, { in: 7, out: 3, cacheRead: 0, cacheWrite: 0 });
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  test("incremental append across two ticks: the second report carries the newly-appended line's model, even with tokens/cost unchanged", () => {
+    const dir = makeScratchDir();
+    try {
+      const path = join(dir, "model-switch.jsonl");
+      const lineFor = (id, model, usage) =>
+        JSON.stringify({ type: "assistant", message: { id, model, usage } }) + "\n";
+
+      writeFileSync(
+        path,
+        lineFor("msg_x", "claude-sonnet-5", {
+          input_tokens: 5,
+          output_tokens: 5,
+          cache_read_input_tokens: 0,
+          cache_creation_input_tokens: 0,
+        })
+      );
+
+      const { enricher, calls } = makeEnricher(() => [{ key: "agent:modelswitch", path }]);
+      enricher.tick();
+
+      assert.equal(calls.length, 1);
+      assert.equal(calls[0].model, "claude-sonnet-5");
+      assert.deepEqual(calls[0].tokens, { in: 5, out: 5, cacheRead: 0, cacheWrite: 0 });
+
+      // Append a second qualifying line under a DIFFERENT model but with
+      // all-zero usage -- totals and cost are unchanged from tick 1, so
+      // this exercises the model-only change guard in reportIfChanged:
+      // a model-only change must still trigger a report (§31.2).
+      appendFileSync(
+        path,
+        lineFor("msg_y", "claude-opus-4-8", {
+          input_tokens: 0,
+          output_tokens: 0,
+          cache_read_input_tokens: 0,
+          cache_creation_input_tokens: 0,
+        })
+      );
+      enricher.tick();
+
+      assert.equal(calls.length, 2, "model-only change (tokens/cost identical) still reports");
+      assert.deepEqual(calls[1].tokens, { in: 5, out: 5, cacheRead: 0, cacheWrite: 0 });
+      assert.equal(calls[1].costUsd, calls[0].costUsd);
+      assert.equal(calls[1].model, "claude-opus-4-8", "second report carries the newly-appended line's model");
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
