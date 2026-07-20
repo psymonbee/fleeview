@@ -278,6 +278,7 @@ function getOrCreateSession(sessionId, t, cwd) {
       transcriptPath: null,
       tokens: null,
       costUsd: null,
+      model: null, // §31.2
       currentActivity: null, // §25
       capabilities: [], // §26
     };
@@ -589,15 +590,11 @@ function applyEvent(evt) {
       addCapabilityTag(session, deriveCapability(evt.tool, evt.hint));
 
       broadcast({ type: "session", session });
+      broadcast({ type: "session-activity", sessionId, entry }); // §31.3
       break;
     }
 
     case "agent.spawn-pending": {
-      // §25: any spawn-pending (exact or fuzzy) means the orchestrator is
-      // delegating -- the fleet takes over the story, clear the pre-plan
-      // activity readout.
-      session.currentActivity = null;
-
       const agentId = evt.agentId;
       if (agentId) {
         // Exact claim.
@@ -633,6 +630,22 @@ function applyEvent(evt) {
           parentAgentId: evt.parentAgentId,
           t,
         });
+
+        // §31.1: a main-loop fuzzy spawn-pending with neither agentId nor
+        // parentAgentId is the moment of delegation -- synthesize a
+        // "delegate" activity so the orchestrator's card keeps narrating
+        // through spawns (supersedes §25's clear). Spawn-pendings carrying
+        // parentAgentId are a subagent's own delegation, not orchestrator
+        // work -- leave currentActivity untouched.
+        if (!evt.agentId && !evt.parentAgentId) {
+          const hint = clip(evt.description ?? evt.agentType ?? "", 120);
+          const activity = { tool: "delegate", hint, t };
+          session.currentActivity = activity;
+
+          const entry = { t, tool: "delegate", hint };
+          pushSessionLogEntry(sessionId, entry);
+          broadcast({ type: "session-activity", sessionId, entry }); // §31.3
+        }
       }
 
       broadcast({ type: "session", session });
@@ -856,12 +869,16 @@ function applyEvent(evt) {
       if (evt.agentId == null) {
         session.tokens = tokens;
         session.costUsd = costUsd;
+        // §31.2: optional model, only-present-fields -- never clears a
+        // known model.
+        if (evt.model !== undefined) session.model = prettifyModel(resolveModelAlias(evt.model));
         broadcast({ type: "session", session });
       } else {
         const agent = agents.get(evt.agentId);
         if (!agent) break; // unknown agent -- skip silently
         agent.tokens = tokens;
         agent.costUsd = costUsd;
+        if (evt.model !== undefined) agent.model = prettifyModel(resolveModelAlias(evt.model));
         broadcast({ type: "agent", agent });
       }
       break;
@@ -1050,7 +1067,12 @@ function getEnrichmentTargets() {
 
 // Sets fields + broadcasts -- deliberately never touches lastActivityAt
 // (§19.2's no-bump rule applies identically to the enricher's writes).
-function onEnrichmentUsage(key, tokens, costUsd) {
+// §31.2: 4th arg `model` (raw id, most-recent qualifying line) -- the
+// SESSION branch prettifies + sets it when non-null, never clearing a known
+// model. The AGENT branch ignores it: agent models come from spawn payloads
+// / discovery meta (§22 resolveAgentMeta) and the enricher must not fight
+// that resolution.
+function onEnrichmentUsage(key, tokens, costUsd, model) {
   const sep = key.indexOf(":");
   if (sep === -1) return;
   const scope = key.slice(0, sep);
@@ -1061,6 +1083,7 @@ function onEnrichmentUsage(key, tokens, costUsd) {
     if (!session) return;
     session.tokens = tokens;
     session.costUsd = costUsd;
+    if (model != null) session.model = prettifyModel(resolveModelAlias(model));
     broadcast({ type: "session", session });
   } else if (scope === "agent") {
     const agent = agents.get(id);

@@ -1,5 +1,10 @@
 # FleetView — live orchestrator model on the hub (session bootstrap)
 
+> **SHIPPED 2026-07-20** as spec §31.2 (PR #9, with the orchestrator card).
+> This file is historical record; the "State at the time of writing" section
+> also predates the §18 rewrite (its "land PR #3 first" / plugin items are
+> obsolete). The probe evidence and gotchas below remain accurate.
+
 Point a fresh Claude Code session at this file to build the feature end to
 end. Repo: `/Users/simon/lumenADE` · GitHub: https://github.com/psymonbee/fleeview
 Surfaced 2026-07-19. Standing contract: `docs/FLEETVIEW-SPEC.md`.

@@ -394,13 +394,19 @@
       left: 8%;
       top: 50%;
       width: 224px;
-      height: 88px;
+      height: 108px;
       transform: translateY(-50%);
       border: 1px solid var(--border);
       border-radius: var(--radius);
       background: linear-gradient(180deg, rgba(21,26,35,.98), rgba(17,21,29,.98));
       box-shadow: var(--shadow);
-      transition: opacity .3s ease, filter .3s ease;
+      cursor: pointer;
+      transition: opacity .3s ease, filter .3s ease, border-color .2s ease, box-shadow .2s ease;
+    }
+
+    .hub:hover {
+      border-color: rgba(25,194,157,.4);
+      box-shadow: var(--shadow), 0 0 0 3px rgba(25,194,157,.12);
     }
 
     .hub::before {
@@ -522,6 +528,29 @@
 
     .hub-activity.show {
       opacity: 1;
+    }
+
+    /* §31.4: capability-chips row under the activity line — always
+       rendered at a fixed height (empty when no capabilities) so the hub
+       card's geometry never shifts; unlike .files-row this is never
+       toggled `hidden`, so the [hidden]-vs-flex precedence trap doesn't
+       apply here. Chips are scoped narrower than the card's file-chip
+       size since HUB_W (224px) is tighter than an agent card (280px). */
+    .hub-caps {
+      display: flex;
+      flex-wrap: nowrap;
+      align-items: center;
+      gap: 4px;
+      height: 16px;
+      margin-top: 4px;
+      overflow: hidden;
+    }
+
+    .hub-caps .file-chip {
+      max-width: 56px;
+      padding: 1px 6px;
+      font-size: 9px;
+      line-height: 1.3;
     }
 
     .empty {
@@ -1224,12 +1253,13 @@
                 </svg>
               </div>
               <div class="hub-text">
-                <div class="hub-title" id="hubTitle">Fable 5</div>
+                <div class="hub-title" id="hubTitle">Orchestrator</div>
                 <div class="hub-subtitle" id="hubSubtitle">
                   <span class="hub-subtitle-text" id="hubSubtitleText">Orchestrator · No session</span>
                   <span class="hub-tokens" id="hubTokens" hidden></span>
                 </div>
                 <div class="hub-activity" id="hubActivity"></div>
+                <div class="hub-caps" id="hubCaps"></div>
               </div>
             </div>
           </section>
@@ -1292,11 +1322,11 @@
         sessions: new Map(),
         agents: new Map(),
         plans: new Map(),
-        config: { hubTitle: "Fable 5", stallThresholdMs: 120000 },
+        config: { hubTitle: "Orchestrator", stallThresholdMs: 120000 },
         selected: FOLLOW,
         connected: false,
         visible: new Set(),
-        drawerAgentId: null,
+        drawerTarget: null,
         prevTurnActive: new Map(),
         lastSeenErrorAt: new Map(),
         pendingErrorFlick: new Set()
@@ -1312,6 +1342,7 @@
         hubSubtitleText: document.getElementById("hubSubtitleText"),
         hubTokens: document.getElementById("hubTokens"),
         hubActivity: document.getElementById("hubActivity"),
+        hubCaps: document.getElementById("hubCaps"),
         empty: document.getElementById("empty"),
         agents: document.getElementById("agents"),
         picker: document.getElementById("sessionPicker"),
@@ -1712,11 +1743,80 @@
         els.drawerLog.scrollTop = els.drawerLog.scrollHeight;
       }
 
+      // §31.4: true when the drawer is currently open on the given target
+      // (kind + id) -- used to gate live-append / re-render against stray
+      // fetches or SSE messages for a target the user has since navigated
+      // away from.
+      function drawerTargetIs(kind, id) {
+        return Boolean(state.drawerTarget) && state.drawerTarget.kind === kind && state.drawerTarget.id === id;
+      }
+
+      function renderDrawerCapsRow(caps) {
+        els.drawerCaps.innerHTML = "";
+        if (caps.length) {
+          caps.forEach(cap => els.drawerCaps.append(capChipNode(cap)));
+          els.drawerCaps.hidden = false;
+        } else {
+          els.drawerCaps.hidden = true;
+        }
+      }
+
+      function renderDrawerTokens(tokens, costUsd) {
+        if (tokens == null) {
+          els.drawerTokens.hidden = true;
+          return;
+        }
+        els.drawerTokens.hidden = false;
+        els.drawerTokensIn.textContent = fmtInt(tokens.in);
+        els.drawerTokensOut.textContent = fmtInt(tokens.out);
+        els.drawerTokensCacheRead.textContent = fmtInt(tokens.cacheRead);
+        els.drawerTokensCacheWrite.textContent = fmtInt(tokens.cacheWrite);
+        if (costUsd != null) {
+          els.drawerTokensCost.hidden = false;
+          els.drawerTokensCost.textContent = `est. ${fmtUsd(costUsd)}`;
+        } else {
+          els.drawerTokensCost.hidden = true;
+        }
+      }
+
       function renderDrawerHeader() {
-        const agent = state.agents.get(state.drawerAgentId);
+        const target = state.drawerTarget;
+        if (!target) return;
+        if (target.kind === "session") {
+          const session = state.sessions.get(target.id);
+          if (!session) return;
+          // Sessions carry no provider tag (only agents do, via discovery /
+          // spawn payloads) -- same anthropic-default idiom as an agent
+          // with an unknown provider (see accent()/LOGOS lookups below).
+          els.drawerImg.src = LOGOS.anthropic;
+          els.drawerLabel.textContent = state.config.hubTitle || "Orchestrator";
+          if (session.model) {
+            els.drawerModel.hidden = false;
+            els.drawerModel.textContent = session.model;
+          } else {
+            els.drawerModel.hidden = true;
+            els.drawerModel.textContent = "";
+          }
+          const statusText = session.turnActive ? "active" : session.ended ? "ended" : "idle";
+          els.drawerStatus.textContent = statusText;
+          els.drawerStatus.classList.toggle("done", statusText === "ended");
+          els.drawer.style.setProperty("--accent", "var(--anthropic)");
+          els.drawerSpawned.hidden = true;
+          els.drawerDesc.textContent = session.cwd || "Working in the session";
+          renderDrawerCapsRow(session.capabilities || []);
+          // Sessions have no `files` concept (only agents track file
+          // touches) -- hide the row rather than claim "no files touched".
+          els.drawerFiles.innerHTML = "";
+          els.drawerFiles.hidden = true;
+          els.drawerFinal.hidden = true;
+          renderDrawerTokens(session.tokens, session.costUsd);
+          return;
+        }
+        const agent = state.agents.get(target.id);
         if (!agent) return;
         els.drawerImg.src = LOGOS[agent.provider] || LOGOS.anthropic;
         els.drawerLabel.textContent = agent.label || agent.agentType || "Agent";
+        els.drawerModel.hidden = false;
         els.drawerModel.textContent = agent.model || "Claude";
         const isDone = agent.status === "done";
         els.drawerStatus.textContent = isDone ? "done" : "running";
@@ -1733,14 +1833,8 @@
           els.drawerSpawned.hidden = true;
         }
         els.drawerDesc.textContent = agent.description || "Working in the session";
-        const caps = agent.capabilities || [];
-        els.drawerCaps.innerHTML = "";
-        if (caps.length) {
-          caps.forEach(cap => els.drawerCaps.append(capChipNode(cap)));
-          els.drawerCaps.hidden = false;
-        } else {
-          els.drawerCaps.hidden = true;
-        }
+        renderDrawerCapsRow(agent.capabilities || []);
+        els.drawerFiles.hidden = false;
         els.drawerFiles.innerHTML = "";
         const files = agent.files || [];
         if (!files.length) {
@@ -1763,26 +1857,12 @@
         } else {
           els.drawerFinal.hidden = true;
         }
-        if (agent.tokens == null) {
-          els.drawerTokens.hidden = true;
-        } else {
-          els.drawerTokens.hidden = false;
-          els.drawerTokensIn.textContent = fmtInt(agent.tokens.in);
-          els.drawerTokensOut.textContent = fmtInt(agent.tokens.out);
-          els.drawerTokensCacheRead.textContent = fmtInt(agent.tokens.cacheRead);
-          els.drawerTokensCacheWrite.textContent = fmtInt(agent.tokens.cacheWrite);
-          if (agent.costUsd != null) {
-            els.drawerTokensCost.hidden = false;
-            els.drawerTokensCost.textContent = `est. ${fmtUsd(agent.costUsd)}`;
-          } else {
-            els.drawerTokensCost.hidden = true;
-          }
-        }
+        renderDrawerTokens(agent.tokens, agent.costUsd);
       }
 
-      function openDrawer(agentId) {
-        if (!agentId) return;
-        state.drawerAgentId = agentId;
+      function openDrawer(target) {
+        if (!target || !target.id) return;
+        state.drawerTarget = target;
         els.drawer.classList.add("open");
         els.drawer.setAttribute("aria-hidden", "false");
         renderDrawerHeader();
@@ -1791,14 +1871,17 @@
         loading.className = "log-empty";
         loading.textContent = "Loading…";
         els.drawerLog.append(loading);
-        fetch(`/agents/${encodeURIComponent(agentId)}/log`)
+        const endpoint = target.kind === "session"
+          ? `/sessions/${encodeURIComponent(target.id)}/log`
+          : `/agents/${encodeURIComponent(target.id)}/log`;
+        fetch(endpoint)
           .then(r => r.json())
           .then(data => {
-            if (state.drawerAgentId !== agentId) return;
+            if (!drawerTargetIs(target.kind, target.id)) return;
             renderDrawerLog(data.entries || []);
           })
           .catch(() => {
-            if (state.drawerAgentId !== agentId) return;
+            if (!drawerTargetIs(target.kind, target.id)) return;
             els.drawerLog.innerHTML = "";
             const failed = document.createElement("div");
             failed.className = "log-empty";
@@ -1808,20 +1891,25 @@
       }
 
       function closeDrawer() {
-        state.drawerAgentId = null;
+        state.drawerTarget = null;
         els.drawer.classList.remove("open");
         els.drawer.setAttribute("aria-hidden", "true");
       }
 
       els.drawerClose.addEventListener("click", closeDrawer);
       document.addEventListener("keydown", event => {
-        if (event.key === "Escape" && state.drawerAgentId) closeDrawer();
+        if (event.key === "Escape" && state.drawerTarget) closeDrawer();
       });
       document.addEventListener("click", event => {
-        if (!state.drawerAgentId) return;
+        if (!state.drawerTarget) return;
         if (els.drawer.contains(event.target)) return;
         if (event.target.closest(".agent")) return;
+        if (event.target.closest(".hub")) return;
         closeDrawer();
+      });
+      els.hub.addEventListener("click", () => {
+        const session = activeSession();
+        if (session) openDrawer({ kind: "session", id: session.id });
       });
 
       // --- notifications ------------------------------------------------------
@@ -1872,7 +1960,7 @@
         state.sessions = new Map();
         state.agents = new Map();
         state.plans = new Map();
-        state.config = Object.assign({ hubTitle: "Fable 5", stallThresholdMs: 120000 }, msg.config || {});
+        state.config = Object.assign({ hubTitle: "Orchestrator", stallThresholdMs: 120000 }, msg.config || {});
         state.prevTurnActive = new Map();
         state.lastSeenErrorAt = new Map();
         state.pendingErrorFlick = new Set();
@@ -1897,7 +1985,13 @@
         if (msg.type === "plan" && msg.plan?.sessionId) {
           state.plans.set(msg.plan.sessionId, msg.plan);
         }
-        if (msg.type === "activity" && msg.agentId && msg.entry && state.drawerAgentId === msg.agentId) {
+        if (msg.type === "activity" && msg.agentId && msg.entry && drawerTargetIs("agent", msg.agentId)) {
+          appendLogEntry(msg.entry);
+        }
+        // §31.3: session-activity is the session-level analogue of the
+        // agent `activity` SSE message above -- live-append when the
+        // session drawer is open on the matching session.
+        if (msg.type === "session-activity" && msg.sessionId && msg.entry && drawerTargetIs("session", msg.sessionId)) {
           appendLogEntry(msg.entry);
         }
         if (msg.session) {
@@ -1907,6 +2001,7 @@
             maybeNotify(msg.session);
           }
           state.prevTurnActive.set(msg.session.id, Boolean(msg.session.turnActive));
+          if (drawerTargetIs("session", msg.session.id)) renderDrawerHeader();
         }
         if (msg.agent) {
           const errAt = msg.agent.lastErrorAt ? parseTime(msg.agent.lastErrorAt) : 0;
@@ -1914,7 +2009,7 @@
           if (errAt && errAt > seenAt) state.pendingErrorFlick.add(msg.agent.id);
           if (errAt) state.lastSeenErrorAt.set(msg.agent.id, errAt);
           upsertAgent(msg.agent);
-          if (state.drawerAgentId === msg.agent.id) renderDrawerHeader();
+          if (drawerTargetIs("agent", msg.agent.id)) renderDrawerHeader();
         }
         if (state.selected !== FOLLOW && !state.sessions.has(state.selected)) {
           state.selected = FOLLOW;
@@ -1933,17 +2028,39 @@
         els.picker.value = sessions.some(s => s.id === previous) ? previous : FOLLOW;
       }
 
+      // §31.4: hub capability-chips row — mirrors renderFiles' ≤3-visible +
+      // `+N` overflow budget but capabilities-only; unlike renderFiles this
+      // has no "no files touched" empty case (an empty row just renders
+      // empty, per the fixed-height/always-rendered contract above).
+      function renderHubCaps(caps) {
+        els.hubCaps.innerHTML = "";
+        const budget = 3;
+        const shown = caps.slice(0, budget);
+        for (const cap of shown) els.hubCaps.append(capChipNode(cap));
+        const overflow = caps.length - shown.length;
+        if (overflow > 0) {
+          const chip = document.createElement("span");
+          chip.className = "file-chip file-more";
+          chip.textContent = `+${overflow}`;
+          els.hubCaps.append(chip);
+        }
+      }
+
       function renderChrome(session, agents, collisions) {
         const running = agents.filter(agent => agent.status === "running").length;
         els.running.textContent = `${running} running`;
         els.collisionChip.style.display = collisions.size > 0 ? "flex" : "none";
         els.hub.classList.toggle("active", Boolean(session?.turnActive));
         els.hub.classList.toggle("ended", Boolean(session?.ended));
-        const hubTitle = state.config.hubTitle || "Fable 5";
+        const hubTitle = state.config.hubTitle || "Orchestrator";
         els.hubTitle.textContent = hubTitle;
         els.hub.setAttribute("aria-label", `${hubTitle} orchestrator`);
         const cwdBase = session ? basename(session.cwd) : "No session";
-        els.hubSubtitleText.textContent = hubTitle === "Orchestrator" ? cwdBase : `Orchestrator · ${cwdBase}`;
+        // §31.2/§31.4: session.model arrives server-prettified — render
+        // verbatim, no client prettify. Blank-until-known.
+        els.hubSubtitleText.textContent = hubTitle === "Orchestrator"
+          ? (session?.model ? `${session.model} · ${cwdBase}` : cwdBase)
+          : `Orchestrator · ${cwdBase}`;
         const sessionTokens = session?.tokens;
         if (sessionTokens == null) {
           els.hubTokens.hidden = true;
@@ -1955,8 +2072,9 @@
           if (session.costUsd != null) title += ` · est. ${fmtUsd(session.costUsd)}`;
           els.hubTokens.title = title;
         }
-        // §25: pre-plan orchestrator activity readout under the subtitle —
-        // shown only while the session is mid-turn and has a live activity.
+        // §25/§31.1: orchestrator activity readout under the subtitle —
+        // shown only while the session is mid-turn and has a live activity
+        // (persists through spawns via the delegate synthesis in §31.1).
         const activity = session?.turnActive ? session.currentActivity : null;
         if (activity && activity.tool) {
           const text = activity.hint ? `${activity.tool}: ${activity.hint}` : activity.tool;
@@ -1968,9 +2086,12 @@
           els.hubActivity.textContent = "";
           els.hubActivity.removeAttribute("title");
         }
+        renderHubCaps(session?.capabilities || []);
         els.empty.hidden = agents.length > 0;
         if (!els.empty.hidden) {
-          els.empty.textContent = session?.currentActivity ? EMPTY_WORKING_TEXT : EMPTY_IDLE_TEXT;
+          // §31.4: same turnActive && currentActivity gate as the activity
+          // line above (previously ungated on turnActive).
+          els.empty.textContent = activity ? EMPTY_WORKING_TEXT : EMPTY_IDLE_TEXT;
         }
       }
 
@@ -2000,7 +2121,7 @@
             <div class="files-row"><\/div>
           <\/div>
         `;
-        node.addEventListener("click", () => openDrawer(node.dataset.id));
+        node.addEventListener("click", () => openDrawer({ kind: "agent", id: node.dataset.id }));
         els.agents.append(node);
         nodes.set(agent.id, node);
         setTimeout(() => node.classList.remove("enter"), 280);

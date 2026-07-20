@@ -425,6 +425,7 @@ Map<callId, {t, tool, hint}>>`, `exactPending: Map<agentId,
 recent-first, deduped), `stepId`, `finalMessage`, `narrative`, `narrativeAt`.
 `Plan = {sessionId, steps: [{id, subject, status, updatedAt}], doc, updatedAt}`
 (steps in creation order). `LogEntry = {t, tool, hint?, file?, error?, ms?}`.
+v5: `Session` gains `model` (§31.2).
 
 Reducer switches on `kind` after the `v === 1` guard. Sessions are still
 created lazily from any event with an unknown `sessionId`.
@@ -434,7 +435,9 @@ created lazily from any event with an unknown `sessionId`.
   `description`/`model` (upsert broadcast); else store in `exactPending`.
   Either way remove the oldest legacy `pendingSpawns` entry for the session
   with the same `description` (its PreToolUse twin — avoids double-claim).
-  Without `agentId`: v1 behavior (cap 20/session, expire 10 min).
+  Without `agentId`: v1 behavior (cap 20/session, expire 10 min). v5: a
+  main-loop fuzzy spawn-pending (no `agentId`, no `parentAgentId`) also
+  synthesizes a delegate activity (§31.1).
 - `agent.start`: create/update AgentRun (id = `agentId`, or synthesized
   `codex:<sessionId>:<n>` when null + codex-direct). `description` = event's,
   else `exactPending[agentId]` (also sets `model`), else v1 fuzzy claim from
@@ -483,6 +486,7 @@ pruned ids.
 - `event: fleet` data types: v1 `{type, session?, agent?}` plus
   `{type: "plan", plan}` and `{type: "activity", agentId, entry}` (activity is
   fire-and-forget for the drawer; cards still update via `type: "agent"`).
+  v5 adds `{type: "session-activity", sessionId, entry}` (§31.3).
 - New `GET /agents/:id/log` → `200 {"agentId": "...", "entries": [LogEntry...]}`
   (`decodeURIComponent` the id — codex ids contain `:`; unknown id → `{agentId,
   entries: []}`). Routed before static handling.
@@ -527,7 +531,8 @@ pruned ids.
   first 8>", tag: sessionId})`. Permission `denied` → toggle renders disabled.
 - **Hub:** title from snapshot `config.hubTitle`; subtitle stays
   `Orchestrator · <cwd basename>` — if the title *is* "Orchestrator", subtitle
-  shows just the cwd basename (no dupe). Generic dot-logo glyph.
+  shows just the cwd basename (no dupe). Generic dot-logo glyph. v5: the hub
+  is the session's card (§31.4).
 - Client state additions: `plans`, `config`, `drawerAgentId`,
   `prevTurnActive` per session, `lastSeenErrorAt` per agent — all reset in
   `replaceSnapshot()`.
@@ -933,7 +938,8 @@ in snapshots and upserts.
 ### 19.2 New neutral kind `agent.usage`
 
 `{agentId: string | null, tokens {in, out, cacheRead, cacheWrite},
-costUsd?}` — `agentId: null` applies to the Session (broadcast
+costUsd?, model?}` (`model?` additive in v5, §31.2) — `agentId: null`
+applies to the Session (broadcast
 `{type: "session", session}`), else to that AgentRun (broadcast
 `{type: "agent", agent}`). Upsert semantics. **MUST NOT bump
 `lastActivityAt`** at either session or agent level — token bookkeeping
@@ -969,7 +975,8 @@ overcounts ~5×). Totals and cost recomputed from the map; on change →
 `lastActivityAt` bump). Cost computed per message from that line's
 `message.model` (handles mixed-model transcripts); lookup: exact id →
 strip trailing date suffix → longest prefix; unknown model → tokens still
-reported, `costUsd` stays null. `forget(key)` on prune.
+reported, `costUsd` stays null. `forget(key)` on prune. v5: `onUsage`
+gains a 4th arg `model` (§31.2).
 
 ### 19.4 Pricing config (fleet.config.json + built-in default)
 
@@ -1228,9 +1235,10 @@ The codex adapter additionally maps Codex's `PermissionRequest`
 hint: "pre"|"post"}` (closes §18.3's unmapped rows; §28c).
 
 **§11:** `Session` gains `currentActivity` (`{tool, hint?, file?, t}` |
-null). Set on `session.activity`; cleared on `agent.spawn-pending`
-(the orchestrator is delegating — the fleet takes over the story) and on
-`turn.end`. Per-session log ring `sessionLogs` (cap 50, same shape as
+null). Set on `session.activity`; cleared on `turn.end`. [v5: the
+`agent.spawn-pending` clear is superseded by a synthesized delegate
+activity (§31.1) — real sessions show the orchestrator keeps working
+during spawns.] Per-session log ring `sessionLogs` (cap 50, same shape as
 `agentLogs` entries) feeds a new endpoint `GET /sessions/:id/log`.
 `session.activity` bumps session freshness only — it must never touch
 any agent's `lastActivityAt` (§19.2's no-bump rule is about usage; this
@@ -1325,7 +1333,9 @@ probe.
 6. Session activity: main-loop `Read` Pre → one `session.activity`;
    main-loop `Agent` Pre → spawn-pending only (no session.activity);
    plain main-loop Post → `[]`; hub shows the activity line pre-plan and
-   clears it on delegation/turn-end; **demo-s1 still renders stalled**.
+   clears it on delegation/turn-end [clear-on-delegation superseded by
+   §31.1 in v5; reducer-v4 test flipped with it]; **demo-s1 still
+   renders stalled**.
 7. Capabilities: `mcp__codex__foo` activity → chip `mcp:codex` (deduped);
    `Skill` activity → chip `skill:<name>`; cap 8 holds; card geometry
    unchanged (CARD_H/RHYTHM byte-identical).
@@ -1358,3 +1368,115 @@ No schema, SSE, or UI change: discovery (§22) styles the new agent
 types with zero configuration — which is the point being demonstrated.
 §29.4's "writes 3 files" is historical v4 record and stands; the
 current acceptance count is five.
+
+## 31. v5 — Orchestrator card, session model, session-activity SSE (amends §11, §12, §13, §15, §19, §25)
+
+Problem: the UI looks dead until the first subagent spawns. The main
+session — which does most of the work (tools, skills, MCP) — renders as
+one truncated line under the hub subtitle, hidden between turns and
+cleared the moment a spawn starts (§25's "the fleet takes over the
+story" rule, which real sessions disprove: the orchestrator keeps
+working during spawns). And the hub cannot say which model is
+orchestrating. v5 promotes the hub into the session's own card and
+wires the model the enricher already parses.
+
+### 31.1 Delegate synthesis (supersedes §25's spawn-clear)
+
+On `agent.spawn-pending` with neither `agentId` nor `parentAgentId` (a
+main-loop Pre-side claim — the moment of delegation), the reducer
+synthesizes `{tool: "delegate", hint: truncate(description ?? agentType
+?? "", 120), t}`: sets `currentActivity`, pushes a session log ring
+entry, broadcasts the session upsert and a `session-activity` message
+(§31.3). Spawn-pendings carrying `agentId` (exact/Post-side; may arrive
+post-mortem) or `parentAgentId` (nested — a subagent's delegation, not
+orchestrator work) leave `currentActivity` untouched. `turn.end` still
+clears. (`deriveCapability("delegate")` yields nothing — no chip
+pollution.)
+
+### 31.2 `Session.model` (amends §11 state, §19.2, §19.3)
+
+New field `model` (display string | null, default null; always
+server-prettified, client renders verbatim). Two sources:
+
+- **(a) Enricher.** `onUsage(key, tokens, costUsd, model)` — `model` is
+  the raw id of the most-recent qualifying assistant line post dedupe
+  (null if none; a model-only change must still trigger a report). The
+  server's session branch sets `prettifyModel(resolveModelAlias(model))`
+  when non-null and never clears a known model; the agent branch ignores
+  it (agent models come from spawn payloads / §22 discovery meta — the
+  enricher must not fight `resolveAgentMeta`).
+- **(b) `agent.usage` optional `model?`** (additive §19.2 field):
+  session branch (`agentId: null`) → `session.model`, agent branch →
+  `agent.model`, both prettified; only-present-fields semantics.
+
+Neither source bumps `lastActivityAt`. Additive SSE/snapshot field, `v`
+stays 1. **Codex session model is explicitly out of scope for v5** —
+the slot stays blank for codex sessions; do not half-wire it.
+
+### 31.3 Session-activity SSE (amends §12)
+
+New fire-and-forget message `{type: "session-activity", sessionId,
+entry}` broadcast wherever a session log ring entry is pushed (real
+`session.activity` and synthesized delegate alike) — the exact analogue
+of `{type: "activity", agentId, entry}`. The session record still
+updates via `{type: "session"}` upserts; `GET /sessions/:id/log` is
+unchanged.
+
+### 31.4 Hub as card (amends §13)
+
+- Height 88 → 108 (= CARD_H; `HUB_W` stays 224).
+- Subtitle: `<model> · <cwd basename>` when `session.model` is known,
+  today's behavior otherwise. Blank-until-known — never a guessed or
+  stale model; `enrichment.enabled: false` degrades cleanly to today's
+  UI.
+- New capability-chips row under the activity line (shared chip
+  renderer, ≤3 + `+N`; the row is always rendered at fixed height,
+  empty when none).
+- The activity line persists through spawns (shows delegate beats);
+  gating stays `turnActive && currentActivity`; the empty-state text
+  adopts the same gate (previously ungated).
+- Hub state classes stay `.active`/`.ended` (idle = neither) plus a
+  pointer/hover affordance — the card's stall/error machinery is NOT
+  cloned.
+- Hub is clickable → session drawer via a generalized drawer target
+  `{kind: 'session' | 'agent', id}`: title = `hubTitle`, model pill
+  (hidden when null), status active/idle/ended, description = cwd,
+  capabilities row, token/cost rows, log from `GET /sessions/:id/log`
+  live-appending `session-activity` entries; ✕ / Esc / click-outside
+  close (the hub itself is exempt from click-outside).
+- `Fable 5` appears nowhere in `public/index.html`; the client title
+  fallback becomes `"Orchestrator"`.
+
+### 31.5 Demo (amends §15)
+
+Orchestrator beats interleaved with the fleet story (persisting through
+and after spawns, one before `turn.end` so the clear is visible); a
+session-level `agent.usage` beat carries `model`; ≥1 session-level
+`Skill` and ≥1 `mcp__*` activity so hub chips render. demo-s1's
+timeline is untouched (stall guard).
+
+### 31.6 v5 acceptance criteria
+
+1. Spec-first: this section lands before any code.
+2. `node --check` every changed `.mjs`; `npm test` green, count > 153,
+   no regression; untouched suites (reducer-usage, both adapter suites,
+   discovery, hook-dispatch, install) pass unmodified.
+3. Reducer: fuzzy spawn-pending → delegate synthesis in
+   `currentActivity` + log ring; exact and nested spawn-pendings leave
+   `currentActivity` untouched; `turn.end` clears; `agent.usage` with
+   `model` sets session/agent model (prettified) without bumping
+   `lastActivityAt`.
+4. Enricher: most-recent qualifying model reported as `onUsage`'s 4th
+   arg (dedupe fixture's mid-session switch → later model wins);
+   model-only change still reports; live integration sets
+   `session.model` within one tick.
+5. Greps: `Fable 5` zero hits in `public/index.html`; zero external
+   URLs in `public/index.html` (§16.5/§29.8 guard).
+6. Live: demo shows hub alive from `turn.start`, delegate lines during
+   spawns, activity persisting through the whole fleet story, chips,
+   click-through session drawer with live-appending log, model in the
+   subtitle after the usage beat; a real session names the
+   orchestrating model within one enricher tick (screenshot = the
+   acceptance deliverable, never committed — may leak private paths).
+7. README hero = demo-canvas PNG at `docs/media/fleetview.png`
+   (committed, captured from the demo — never from the real session).

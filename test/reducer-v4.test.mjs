@@ -443,7 +443,7 @@ describe("reducer v4 — nested-spawn lineage (§24)", () => {
 describe("reducer v4 — session.activity (§25)", () => {
   const SESSION_ID = "activity-session";
 
-  test("sets currentActivity, cleared by spawn-pending, cleared by turn.end", async () => {
+  test("sets currentActivity, synthesizes delegate on fuzzy spawn-pending (§31.1), cleared by turn.end", async () => {
     const T0 = "2026-03-01T00:00:00.000Z";
     const T1 = "2026-03-01T00:00:01.000Z";
     const T2 = "2026-03-01T00:00:02.000Z";
@@ -467,8 +467,9 @@ describe("reducer v4 — session.activity (§25)", () => {
     let session = findSession(snap, SESSION_ID);
     assert.deepEqual(session.currentActivity, { tool: "Read", hint: "reading plan.md", file: "plan.md", t: T2 });
 
-    // agent.spawn-pending (any -- fuzzy here) clears it: the orchestrator is
-    // delegating.
+    // A fuzzy agent.spawn-pending (no agentId, no parentAgentId) is the
+    // moment of delegation -- §31.1 synthesizes a "delegate" activity
+    // instead of clearing currentActivity (supersedes §25's spawn-clear).
     appendEvent({
       v: 1,
       source: "claude-code",
@@ -479,9 +480,25 @@ describe("reducer v4 — session.activity (§25)", () => {
       description: "go build it",
     });
 
-    snap = await waitForSnapshot((s) => findSession(s, SESSION_ID)?.currentActivity == null);
+    snap = await waitForSnapshot((s) => findSession(s, SESSION_ID)?.currentActivity?.tool === "delegate");
     session = findSession(snap, SESSION_ID);
-    assert.equal(session.currentActivity, null, "spawn-pending clears currentActivity");
+    assert.deepEqual(
+      session.currentActivity,
+      { tool: "delegate", hint: "go build it", t: T3 },
+      "fuzzy spawn-pending synthesizes a delegate activity, not a clear"
+    );
+
+    // The delegate synthesis also pushes a session log ring entry, appearing
+    // after the earlier Read entry.
+    const logAfterDelegate = await fetchJson(`/sessions/${SESSION_ID}/log`);
+    assert.equal(logAfterDelegate.entries.length, 2, "Read entry, then delegate entry");
+    assert.deepEqual(logAfterDelegate.entries[0], {
+      t: T2,
+      tool: "Read",
+      hint: "reading plan.md",
+      file: "plan.md",
+    });
+    assert.deepEqual(logAfterDelegate.entries[1], { t: T3, tool: "delegate", hint: "go build it" });
 
     // Set it again, then confirm turn.end also clears it.
     appendEvent({

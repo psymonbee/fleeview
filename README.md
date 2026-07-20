@@ -20,10 +20,12 @@ harness level, so whatever agent types your session spawns become cards, and
 their display metadata (label, model, provider accent) is **auto-discovered**
 from `~/.claude/agents` and the project's `.claude/agents` frontmatter. When a
 subagent spawns its own subagent, the child card indents under its parent with
-a parent-to-child edge — the canvas is a tree, not a hub-and-spokes. Before
-the first agent exists, the hub shows what the orchestrator itself is doing
-(reading, searching, running commands), and cards grow skill/MCP capability
-chips as agents use them.
+a parent-to-child edge — the canvas is a tree, not a hub-and-spokes. The hub
+is the session's own card: alive from the moment you hit send, it shows what
+the orchestrator is doing (reading, searching, delegating — the readout
+persists while subagents run), names the model actually orchestrating (read
+live off the transcript), grows the same skill/MCP capability chips agents
+get, and opens its own drawer with the session's tool-call log.
 
 ![FleetView](docs/media/fleetview.gif)
 <!-- capture TBD -->

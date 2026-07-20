@@ -49,6 +49,8 @@ export function createEnricher({ config, getTargets, onUsage }) {
    *   perMessage: Map<string, {in:number, out:number, cacheRead:number, cacheWrite:number, model:string}>,
    *   lastTokens: {in:number, out:number, cacheRead:number, cacheWrite:number} | null,
    *   lastCostUsd: number | null,
+   *   model: string | null,
+   *   lastModel: string | null,
    * }>}
    * keyed by the opaque target key the server hands us (e.g. "agent:<id>" /
    * "session:<id>") — this module never interprets the key, only stores
@@ -69,6 +71,8 @@ export function createEnricher({ config, getTargets, onUsage }) {
         perMessage: new Map(),
         lastTokens: null,
         lastCostUsd: null,
+        model: null,
+        lastModel: null,
       };
       state.set(key, s);
     }
@@ -112,13 +116,18 @@ export function createEnricher({ config, getTargets, onUsage }) {
       prev.cacheRead === totals.cacheRead &&
       prev.cacheWrite === totals.cacheWrite;
     const sameCost = s.lastCostUsd === finalCost;
-    if (sameTokens && sameCost) return;
+    // A model-only change (e.g. a session switching models mid-run with
+    // identical token/cost totals this tick) must still trigger a report --
+    // the model readout has to stay honest and live (§31.2).
+    const sameModel = s.lastModel === s.model;
+    if (sameTokens && sameCost && sameModel) return;
 
     s.lastTokens = totals;
     s.lastCostUsd = finalCost;
+    s.lastModel = s.model;
 
     try {
-      onUsage(key, totals, finalCost);
+      onUsage(key, totals, finalCost, s.model);
     } catch {
       // onUsage is caller-owned; a throw there must not crash us.
     }
@@ -160,6 +169,11 @@ export function createEnricher({ config, getTargets, onUsage }) {
         cacheWrite: usage.cache_creation_input_tokens || 0,
         model: message.model,
       });
+      // Lines are processed in file order and this always overwrites, so
+      // after the loop s.model holds the model of the last qualifying line
+      // seen so far (cumulative across ticks) -- the "most recent" readout,
+      // honest to mid-session model switches, independent of per-id dedupe.
+      s.model = message.model;
       changed = true;
     }
     return changed;
@@ -186,6 +200,7 @@ export function createEnricher({ config, getTargets, onUsage }) {
       s.offset = 0;
       s.buf = "";
       s.perMessage.clear();
+      s.model = null;
     }
 
     if (stat.size === s.offset) return; // nothing new this tick
