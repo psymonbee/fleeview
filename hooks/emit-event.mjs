@@ -65,7 +65,7 @@ async function main() {
   const lines = events.map((event) => JSON.stringify(event)).join("\n") + "\n";
 
   const eventsFile =
-    process.env.FLEET_EVENTS_FILE || `${process.env.HOME}/.lumenade/events.jsonl`;
+    process.env.FLEET_EVENTS_FILE || `${process.env.HOME}/.agenticade/events.jsonl`;
 
   mkdirSync(dirname(eventsFile), { recursive: true });
   appendFileSync(eventsFile, lines);

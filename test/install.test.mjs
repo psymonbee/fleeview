@@ -2,7 +2,7 @@
 // node:assert only. Spawns bin/install.mjs as a child process with HOME
 // pointed at a scratch directory (the test seam — the installer derives all
 // home-relative paths from os.homedir()), so it never touches the real
-// ~/.claude/settings.json or ~/.lumenade/.
+// ~/.claude/settings.json or ~/.agenticade/.
 
 import { test, describe } from "node:test";
 import assert from "node:assert/strict";
@@ -119,7 +119,7 @@ describe("bin/install.mjs — fresh install", () => {
   });
 
   test("app dir populated and copied hook passes node --check", () => {
-    const hookPath = join(home, ".lumenade", "app", "hooks", "emit-event.mjs");
+    const hookPath = join(home, ".agenticade", "app", "hooks", "emit-event.mjs");
     assert.ok(existsSync(hookPath), "copied hook exists");
     const check = spawnSync(process.execPath, ["--check", hookPath], { encoding: "utf8" });
     assert.equal(check.status, 0, `node --check failed: ${check.stderr}`);
@@ -260,7 +260,7 @@ describe("bin/install.mjs — --uninstall", () => {
       assert.ok(after.hooks.PreToolUse.some((e) => e.matcher === "Bash"));
 
       // App dir is left alone (removal is a manual rm -rf per spec §17.3).
-      assert.ok(existsSync(join(home, ".lumenade", "app")));
+      assert.ok(existsSync(join(home, ".agenticade", "app")));
     } finally {
       rmSync(home, { recursive: true, force: true });
     }
@@ -282,7 +282,7 @@ describe("bin/install.mjs — --dev", () => {
         `${process.execPath} ${join(devPath, "hooks", "emit-event.mjs")}`
       );
 
-      assert.ok(!existsSync(join(home, ".lumenade", "app")), "no vendored copy created");
+      assert.ok(!existsSync(join(home, ".agenticade", "app")), "no vendored copy created");
     } finally {
       rmSync(home, { recursive: true, force: true });
     }
@@ -320,7 +320,7 @@ describe("bin/install.mjs — --with-codex (§18.4/§18.5)", () => {
 
       // Absolute interpreter (§17.4), codex adapter arg, vendored app path —
       // asserted on the exact command line, once per event.
-      const hookScript = join(home, ".lumenade", "app", "hooks", "emit-event.mjs");
+      const hookScript = join(home, ".agenticade", "app", "hooks", "emit-event.mjs");
       const commandLine = `command = "${process.execPath} ${hookScript} codex"`;
       const occurrences = result.stdout.split(commandLine).length - 1;
       assert.equal(occurrences, CODEX_EVENTS.length, "one absolute-interpreter command per event");
@@ -337,7 +337,7 @@ describe("bin/install.mjs — --with-codex (§18.4/§18.5)", () => {
       assert.ok(result.stdout.includes("codex-notify"), "prints notify alternative");
       assert.ok(!result.stdout.includes("codex plugin"), "no dead plugin registration commands (§18.6)");
       assert.ok(
-        !existsSync(join(home, ".lumenade", "app", "codex-plugin")),
+        !existsSync(join(home, ".agenticade", "app", "codex-plugin")),
         "no plugin scaffold directory created"
       );
       assert.ok(!existsSync(join(home, ".codex")), "nothing created under ~/.codex");
@@ -357,10 +357,10 @@ describe("bin/install.mjs — --with-codex (§18.4/§18.5)", () => {
       const occurrences = result.stdout.split(commandLine).length - 1;
       assert.equal(occurrences, CODEX_EVENTS.length, "every command points at the dev checkout");
 
-      assert.ok(!existsSync(join(home, ".lumenade", "app")), "still no vendored copy");
+      assert.ok(!existsSync(join(home, ".agenticade", "app")), "still no vendored copy");
       assert.ok(
-        !existsSync(join(home, ".lumenade", "codex-plugin")),
-        "no plugin scaffold directory under ~/.lumenade either"
+        !existsSync(join(home, ".agenticade", "codex-plugin")),
+        "no plugin scaffold directory under ~/.agenticade either"
       );
     } finally {
       rmSync(home, { recursive: true, force: true });
@@ -451,13 +451,13 @@ describe("bin/install.mjs — --with-agents (§23)", () => {
     }
   });
 
-  test("vendored ~/.lumenade/app contains starter-agents/ with all 5 files", () => {
+  test("vendored ~/.agenticade/app contains starter-agents/ with all 5 files", () => {
     const home = makeScratchHome();
     try {
       const result = runInstaller(home, ["--yes"]);
       assert.equal(result.status, 0, `stderr: ${result.stderr}`);
 
-      const vendoredDir = join(home, ".lumenade", "app", "starter-agents");
+      const vendoredDir = join(home, ".agenticade", "app", "starter-agents");
       assert.ok(existsSync(vendoredDir), "starter-agents/ vendored");
       for (const file of STARTER_AGENTS) {
         assert.ok(existsSync(join(vendoredDir, file)), `${file} vendored`);

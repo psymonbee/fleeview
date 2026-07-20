@@ -2,10 +2,10 @@
 
 > **v2 amendment applies.** Sections §8–§16 below supersede parts of v1:
 > the raw-payload capture in §2 (replaced by the neutral-event adapter, §8–§9),
-> the events-file path (§8: now `~/.lumenade/events.jsonl`), and the hardcoded
+> the events-file path (§8: now `~/.agenticade/events.jsonl`), and the hardcoded
 > model map in §3 (replaced by `fleet.config.json`, §10).
 
-LumenADE Fleet View: a live, n8n/make.com-style visualization of Claude Code
+agenticADE Fleet View: a live, n8n/make.com-style visualization of Claude Code
 agent-fleet activity. Claude Code hooks append raw events to a JSONL file; a
 zero-dependency Node server tails it, normalizes, and pushes state over SSE; a
 single-file browser UI renders the fleet as an animated node graph.
@@ -181,7 +181,7 @@ Target modern Chrome/Safari. Aim for clean, readable code, roughly ≤ 900 lines
 
 ### Layout
 
-- Header, 48 px: left — dot logo + `LumenADE · Fleet view`; right — running
+- Header, 48 px: left — dot logo + `agenticADE · Fleet view`; right — running
   count chip (`N running`), session `<select>`, live-connection dot (green =
   SSE open, red = reconnecting). Session option label:
   `<cwd basename> · <first 8 chars of id>`, sorted by lastActivityAt desc, with
@@ -276,7 +276,7 @@ Constraints unchanged: zero npm dependencies, Node ≥ 20 ESM, hook is a pure
 observer, `public/index.html` stays one self-contained file with no external
 requests, SSE sends full-record upserts by id.
 
-Events file moves to `~/.lumenade/events.jsonl` (env `FLEET_EVENTS_FILE` still
+Events file moves to `~/.agenticade/events.jsonl` (env `FLEET_EVENTS_FILE` still
 overrides). Old `~/.claude/fleet/` is abandoned, not migrated; v1-format lines
 are silently skipped by the v2 reducer.
 
@@ -382,7 +382,7 @@ Mapping (anything not listed → `[]`):
    `new URL("../adapters/claude-code.mjs", import.meta.url)` so the absolute
    `node /Users/simon/lumenADE/hooks/emit-event.mjs` invocation keeps working.
 4. Append all returned lines in a **single** `appendFileSync`.
-5. Default path `~/.lumenade/events.jsonl`; `FLEET_EVENTS_FILE` overrides.
+5. Default path `~/.agenticade/events.jsonl`; `FLEET_EVENTS_FILE` overrides.
 6. Same never-throw / always-exit-0 wrapper as v1.
 
 ## 10. `fleet.config.json` (repo root)
@@ -490,7 +490,7 @@ pruned ids.
 - New `GET /agents/:id/log` → `200 {"agentId": "...", "entries": [LogEntry...]}`
   (`decodeURIComponent` the id — codex ids contain `:`; unknown id → `{agentId,
   entries: []}`). Routed before static handling.
-- `/healthz` unchanged. Default events path now `~/.lumenade/events.jsonl`.
+- `/healthz` unchanged. Default events path now `~/.agenticade/events.jsonl`.
 
 ## 13. UI v2 — `public/index.html`
 
@@ -669,8 +669,8 @@ from `os.homedir()` (the test seam — tests run with a scratch `HOME`).
 absolute path): the bin resolves its package root via `import.meta.url`,
 copies the whitelist `hooks/ adapters/ server/ public/ scripts/
 fleet.config.json package.json README.md docs/FLEETVIEW-SPEC.md` to
-`~/.lumenade/app.staging-<pid>` (`fs.cpSync` recursive), then removes any
-old `~/.lumenade/app` and renames staging into place. Re-run = upgrade.
+`~/.agenticade/app.staging-<pid>` (`fs.cpSync` recursive), then removes any
+old `~/.agenticade/app` and renames staging into place. Re-run = upgrade.
 Exception: if the existing `app/fleet.config.json` differs from the bundled
 default, the user's copy is preserved (notice printed).
 
@@ -693,7 +693,7 @@ default, the user's copy is preserved (notice printed).
 
 **Flags:** `--yes` (non-interactive; without it and with a TTY, plain-text
 confirm), `--uninstall` (remove all hook entries containing
-`/hooks/emit-event.mjs`, print `rm -rf ~/.lumenade` instructions, leave
+`/hooks/emit-event.mjs`, print `rm -rf ~/.agenticade` instructions, leave
 backups), `--dev <repo-path>` (wire hooks at a checkout instead of copying
 — what the dev machine uses), `--with-codex` (also wire Codex hooks per
 §18.4; prints "experimental"), `--start` (run the server foreground after
@@ -707,7 +707,7 @@ stays (blocks registry publish only; git installs unaffected).
 ### 17.3 Removal
 
 `npx github:psymonbee/fleeview --uninstall` (or hand-delete the 8 hook
-entries), then `rm -rf ~/.lumenade`. Backups under `~/.claude/` are left
+entries), then `rm -rf ~/.agenticade`. Backups under `~/.claude/` are left
 for the user. No other machine state exists.
 
 ### 17.4 Interpreter resolution (added 2026-07-18)
@@ -718,7 +718,7 @@ whatever launched the harness, and a GUI-launched `Claude.app` inherits the
 macOS default `PATH` (`/usr/bin:/bin:/usr/sbin:/sbin`), which contains **no**
 nvm/fnm/volta node. A bare `node` there fails with "command not found",
 and it fails *silently* — a failing hook neither blocks the harness nor
-surfaces an error — so `~/.lumenade/events.jsonl` is never created and the
+surfaces an error — so `~/.agenticade/events.jsonl` is never created and the
 canvas stays permanently empty with no diagnostic.
 
 Found on the first fresh-machine run (2026-07-18): Claude launched from
@@ -1500,7 +1500,7 @@ manual dragging fixes it, because the next spawn re-overlaps.
 Problem B — **positions are not the user's to choose**. There is no way
 to pull a card out of the column.
 
-Problem C — **the picker names sessions by UUID**. `lumenADE · 7914195e`
+Problem C — **the picker names sessions by UUID**. `agenticADE · 7914195e`
 tells you nothing; the session's real name is "Delegated otter plan".
 
 ### 32.1 One position source (amends §13)

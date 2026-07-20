@@ -86,8 +86,8 @@ do not invent a second path.
    v4's `parentId`, `session.activity`, `capabilities`.
 3. **`public/index.html`** — render it in the hub subtitle. There is a
    ready-made slot: at `:1947` the subtitle collapses to bare `cwdBase` when
-   `hubTitle === "Orchestrator"`, so today it shows just `lumenADE`.
-   `Claude Opus 4.8 · lumenADE` fits the existing rhythm, sits beside the
+   `hubTitle === "Orchestrator"`, so today it shows just `agenticADE`.
+   `Claude Opus 4.8 · agenticADE` fits the existing rhythm, sits beside the
    token badge that arrives on the same pipe, and needs no geometry change.
    Kill the `Fable 5` placeholders while you are in there.
 
@@ -114,7 +114,7 @@ do not invent a second path.
 - `hooks/emit-event.mjs` and `adapters/*.mjs` are **LIVE on this machine** —
   edits take effect instantly for every running session. Atomic Write then
   immediate `node --check`. (This change should not need to touch them.)
-- Never point a test server at `~/.lumenade/events.jsonl`; use a scratch
+- Never point a test server at `~/.agenticade/events.jsonl`; use a scratch
   `FLEET_EVENTS_FILE` and ports 48xx.
 
 ## Gotchas that will bite this specific change
@@ -144,7 +144,7 @@ do not invent a second path.
    (no model) degrades cleanly to today's UI.
 4. `npm test` green, no count regression.
 5. **Live**: run a server against Simon's own
-   `~/.lumenade/events.jsonl`, open a real session, and see the hub name the
+   `~/.agenticade/events.jsonl`, open a real session, and see the hub name the
    model actually running — the literal question that started this. A
    screenshot of that is the deliverable.
 6. `Fable 5` appears nowhere in `public/index.html`.
@@ -165,7 +165,7 @@ workstream.
   (Codex 0.144.5 marketplace scaffold) open and mergeable — **land it first**;
   it is the last unmerged v4 install work.
 - Fresh-machine end-to-end has effectively **passed**: the `binface` account
-  has a vendored `~/.lumenade/app/` with an absolute-node hook command and
+  has a vendored `~/.agenticade/app/` with an absolute-node hook command and
   live events. §17.4 is proven on a clean account.
 - Still pending, unrelated to this feature: Codex plugin registration on
   Simon's real `~/.codex` (§21.7(b) — note `notify` there is already claimed

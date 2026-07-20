@@ -52,7 +52,7 @@ Both scoped workstreams below are **shipped**:
    `Session.model` flows from the enricher (4-arg `onUsage`, most-recent
    qualifying line, never clears) and from `agent.usage`'s additive `model?`.
    Real-session proof passed: a read-only server on the live events file
-   painted `Claude Fable 5 · lumenADE` within one enricher tick. Codex
+   painted `Claude Fable 5 · agenticADE` within one enricher tick. Codex
    session model explicitly out of scope (§31.2).
 
 **Deferred by owner (2026-07-20): all screenshots/video/hero media** — a
@@ -151,7 +151,7 @@ Everything in the v3 list still holds (see `V4-BOOTSTRAP.md`; keep: failing
 tools emit PreToolUse only; TaskCreate id arrives in the Post response;
 hooks hot-reload and `hooks/emit-event.mjs` + `adapters/*.mjs` are LIVE on
 this machine — atomic edits + immediate `node --check`; never point a test
-server at `~/.lumenade/events.jsonl`, use scratch `FLEET_EVENTS_FILE` +
+server at `~/.agenticade/events.jsonl`, use scratch `FLEET_EVENTS_FILE` +
 ports 48xx; demo backdates `t` and the reducer trusting it is load-bearing;
 FLEET_IGNORE guard is two-sided; Codex hooks are plugin-gated; transcript
 assistant lines repeat per content block — dedupe by message.id last-wins).

@@ -1,3 +1,10 @@
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="brand/png/lockup-dark.png">
+    <img alt="agenticADE" src="brand/png/lockup-light.png" width="440">
+  </picture>
+</p>
+
 # FleetView
 
 FleetView is a live, n8n/make.com-style canvas for Claude Code agent-fleet
@@ -36,13 +43,13 @@ get, and opens its own drawer with the session's tool-call log.
 npx github:psymonbee/fleeview
 ```
 
-This clones the repo, vendors it to `~/.lumenade/app`, and merges the eight
+This clones the repo, vendors it to `~/.agenticade/app`, and merges the eight
 hook entries below into `~/.claude/settings.json` (backing up the existing
 file first). Requires `git` on your `PATH` — `npx github:` installs by
 cloning, not from the npm registry.
 
 ```sh
-node ~/.lumenade/app/server/server.mjs
+node ~/.agenticade/app/server/server.mjs
 ```
 
 Open **http://localhost:4747** — with no events yet you'll see an idle hub.
@@ -50,7 +57,7 @@ To see it move without a real session, run the bundled demo from the
 vendored app:
 
 ```sh
-cd ~/.lumenade/app && npm run demo -- --fast
+cd ~/.agenticade/app && npm run demo -- --fast
 ```
 
 **Manual install**, working from a checkout instead of the vendored copy:
@@ -95,7 +102,7 @@ hooks/emit-event.mjs        thin observer — always exit 0, never blocks a tool
 adapters/claude-code.mjs    stateless translator, [] on anything unrecognized
         │  neutral events {v, source, t, kind, sessionId, ...}
         ▼
-~/.lumenade/events.jsonl    versioned, harness-neutral JSONL log
+~/.agenticade/events.jsonl    versioned, harness-neutral JSONL log
         │  tailed incrementally
         ▼
 server/server.mjs           reducer + SSE :4747 + GET /agents/:id/log, /sessions/:id/log
@@ -132,7 +139,7 @@ event, deduping its own entries on re-run rather than duplicating them:
 }
 ```
 
-`<install path>` is `~/.lumenade/app` normally, or your checkout for
+`<install path>` is `~/.agenticade/app` normally, or your checkout for
 `--dev`. Everything else already in `settings.json` is left untouched; a
 timestamped backup is written before every merge.
 
@@ -226,7 +233,7 @@ This path is newer and less exercised; expect rough edges.
 
 ```sh
 npx github:psymonbee/fleeview --uninstall
-rm -rf ~/.lumenade
+rm -rf ~/.agenticade
 ```
 
 The first removes the eight hook entries the installer added from

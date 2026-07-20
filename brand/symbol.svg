@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200" viewBox="0 0 200 200" role="img" aria-label="agenticADE symbol">
+  <title>agenticADE symbol</title>
+  <desc>An open swarm of cherry-crimson bubbles rising and growing from lower-left to upper-right.</desc>
+  <g transform="translate(-3,3)">
+    <circle cx="78" cy="158" r="5" fill="#E11D6B"/>
+    <circle cx="68" cy="142" r="8" fill="#E11D6B"/>
+    <circle cx="92" cy="132" r="6" fill="none" stroke="#E11D6B" stroke-width="2.5"/>
+    <circle cx="86" cy="110" r="12" fill="#E11D6B"/>
+    <circle cx="112" cy="120" r="5" fill="#FF5C8A"/>
+    <circle cx="108" cy="84" r="16" fill="#E11D6B"/>
+    <circle cx="134" cy="96" r="6" fill="#FF5C8A"/>
+    <circle cx="100" cy="66" r="6" fill="none" stroke="#E11D6B" stroke-width="2.5"/>
+    <circle cx="130" cy="52" r="20" fill="#E11D6B"/>
+  </g>
+</svg>

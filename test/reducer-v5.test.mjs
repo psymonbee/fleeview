@@ -1,7 +1,7 @@
 // Reducer v5 test suite (docs/FLEETVIEW-SPEC.md §31 — orchestrator card,
 // session model, session-activity SSE). Boots the real server/server.mjs as
 // a child process against a scratch FLEET_EVENTS_FILE and a scratch HOME, on
-// port 4858 (never the live ~/.lumenade/events.jsonl or
+// port 4858 (never the live ~/.agenticade/events.jsonl or
 // ~/.claude/settings.json, never port 4747 which is the binface test rig).
 // Drives it by appending neutral events to the events file and reading back
 // the SSE snapshot / log endpoints over HTTP -- the same interface a real

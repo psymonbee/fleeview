@@ -2,7 +2,7 @@
 // FleetView npx installer (docs/FLEETVIEW-SPEC.md §17.2). Zero-dep, hand-rolled
 // arg parsing, all home-relative paths derive from os.homedir() (the test seam
 // — tests run with a scratch HOME). Two jobs:
-//   1. Self-vendor a stable copy of this package to ~/.lumenade/app (npx's own
+//   1. Self-vendor a stable copy of this package to ~/.agenticade/app (npx's own
 //      cache is ephemeral; hooks need a stable absolute path to invoke).
 //   2. Merge FleetView's eight hook entries into ~/.claude/settings.json
 //      without disturbing anything else the user has configured there.
@@ -242,15 +242,15 @@ function installStarterAgents(packageRoot, home) {
   }
 }
 
-// Self-vendoring copy: package root -> ~/.lumenade/app.staging-<pid> -> rename
-// into place at ~/.lumenade/app. Preserves a user-modified app/fleet.config.json
+// Self-vendoring copy: package root -> ~/.agenticade/app.staging-<pid> -> rename
+// into place at ~/.agenticade/app. Preserves a user-modified app/fleet.config.json
 // across upgrades.
 function selfVendor(packageRoot, home) {
-  const lumenadeDir = join(home, ".lumenade");
-  const appDir = join(lumenadeDir, "app");
-  const staging = join(lumenadeDir, `app.staging-${process.pid}`);
+  const agenticadeDir = join(home, ".agenticade");
+  const appDir = join(agenticadeDir, "app");
+  const staging = join(agenticadeDir, `app.staging-${process.pid}`);
 
-  mkdirSync(lumenadeDir, { recursive: true });
+  mkdirSync(agenticadeDir, { recursive: true });
   rmSync(staging, { recursive: true, force: true });
   mkdirSync(staging, { recursive: true });
 
@@ -330,7 +330,7 @@ async function main() {
     writeSettings(settingsPath, settings);
     console.log(`Removed FleetView's hook entries from ${settingsPath}.`);
     console.log(`Backup kept at ${backupPath}.`);
-    console.log(`To finish removal: rm -rf ${join(home, ".lumenade")}`);
+    console.log(`To finish removal: rm -rf ${join(home, ".agenticade")}`);
     const survivingAgents = STARTER_AGENTS.map((f) =>
       join(home, ".claude", "agents", f)
     ).filter(existsSync);

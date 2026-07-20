@@ -26,7 +26,7 @@ const CONFIG_PATH = path.resolve(__dirname, "..", "fleet.config.json");
 const PORT = Number(process.env.PORT) || 4747;
 const EVENTS_FILE =
   process.env.FLEET_EVENTS_FILE ||
-  path.join(process.env.HOME || "", ".lumenade", "events.jsonl");
+  path.join(process.env.HOME || "", ".agenticade", "events.jsonl");
 
 const PING_INTERVAL_MS = 15000;
 const POLL_INTERVAL_MS = 1000;
@@ -1261,6 +1261,7 @@ const CONTENT_TYPES = {
   ".css": "text/css; charset=utf-8",
   ".svg": "image/svg+xml",
   ".png": "image/png",
+  ".ico": "image/x-icon",
   ".json": "application/json; charset=utf-8",
 };
 

@@ -17,7 +17,7 @@ const SESSION_ID = `demo-${process.pid}`;
 const CWD = "/Users/simon/lumenADE";
 
 const EVENTS_FILE =
-  process.env.FLEET_EVENTS_FILE || `${homedir()}/.lumenade/events.jsonl`;
+  process.env.FLEET_EVENTS_FILE || `${homedir()}/.agenticade/events.jsonl`;
 
 mkdirSync(dirname(EVENTS_FILE), { recursive: true });
 

@@ -15,7 +15,7 @@ live-pipeline integration + browser sweep), and committed. On top of the v2
 pipeline it added:
 
 ```
-bin/install.mjs           npx installer: self-vendors to ~/.lumenade/app, merges
+bin/install.mjs           npx installer: self-vendors to ~/.agenticade/app, merges
                           hooks into ~/.claude/settings.json (backup + dedupe),
                           --yes/--uninstall/--dev/--with-codex/--start
 adapters/codex.mjs        Codex CLI translator (source:"codex", every id
@@ -43,7 +43,7 @@ schema/SSE/UI shape** — unchanged rule. `npm test` = bare `node --test`.
 2. Run the installer for real: `npx github:psymonbee/fleeview` on another
    machine, or `node bin/install.mjs --dev /Users/simon/lumenADE` on THIS one
    (keeps hooks pointing at the checkout — do NOT plain-install here or hooks
-   move to ~/.lumenade/app).
+   move to ~/.agenticade/app).
 3. If Codex capture is wanted: run the two `codex plugin` commands the
    installer prints with `--with-codex` (persistent, account-linked — that's
    why the fleet never ran them). §21.7(b) live validation happens then.
@@ -80,7 +80,7 @@ Everything in the v2 list still holds (failing tools emit PreToolUse only;
 async Agent spawns carry tool_response.agentId; TaskCreate id arrives in the
 Post response; headless claude never dispatches ExitPlanMode; hooks
 hot-reload and `hooks/emit-event.mjs` is LIVE — atomic Write + immediate
-`node --check`; never point a test server at `~/.lumenade/events.jsonl`, use
+`node --check`; never point a test server at `~/.agenticade/events.jsonl`, use
 scratch `FLEET_EVENTS_FILE` + ports 48xx; the demo backdates `t` and the
 reducer trusting it is load-bearing; FLEET_IGNORE guard is two-sided). New in
 v3 (S2 probe, 2026-07-17, Codex CLI 0.144.5 — full notes in

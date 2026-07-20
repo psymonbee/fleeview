@@ -1,7 +1,7 @@
 // Reducer v3 token/cost enrichment test suite (docs/FLEETVIEW-SPEC.md §19,
 // §21.1). Boots the real server/server.mjs as a child process against a
 // scratch FLEET_EVENTS_FILE and a scratch HOME, on a 48xx port (never the
-// live ~/.lumenade/events.jsonl or ~/.claude/settings.json). Drives it by
+// live ~/.agenticade/events.jsonl or ~/.claude/settings.json). Drives it by
 // appending neutral events to the events file and reading back the SSE
 // snapshot over HTTP -- the same interface a real client uses.
 //

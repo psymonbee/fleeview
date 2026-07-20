@@ -104,7 +104,7 @@ shape. That one untested inference sent v3 and v4 down a dead road.
 Sequence run: `[hooks.*]` block appended to binface's `~/.codex/config.toml`
 (10 events) → interactive `codex`, trust prompt approved once → quit →
 `codex exec --skip-git-repo-check "say hi"` with **no** bypass flag. Captured
-in `~/.lumenade/events.jsonl`:
+in `~/.agenticade/events.jsonl`:
 
 ```json
 {"v":1,"source":"codex","t":"2026-07-19T17:40:03.924Z","sessionId":"codex:019f7b76-ab4a-78f1-939d-2fceabfa8e3e","kind":"session.start","cwd":"/Users/binface/test","transcriptPath":"/Users/binface/.codex/sessions/2026/07/19/rollout-…jsonl"}
@@ -203,7 +203,7 @@ Delivery swap. Capture logic stays.
   that doesn't need auth. It does **not** carry credentials, so any test
   needing a model turn must run in a real account.
 - Codex refuses to run outside a git repo without `--skip-git-repo-check`.
-- Never point a test server at `~/.lumenade/events.jsonl`; use scratch
+- Never point a test server at `~/.agenticade/events.jsonl`; use scratch
   `FLEET_EVENTS_FILE` + ports 48xx. Port 4747 belongs to binface's rig.
 
 ## Acceptance
