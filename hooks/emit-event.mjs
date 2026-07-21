@@ -8,7 +8,8 @@
 // hang the hook into its timeout).
 
 import { mkdirSync, appendFileSync } from "node:fs";
-import { dirname } from "node:path";
+import { dirname, join } from "node:path";
+import { homedir } from "node:os";
 
 const ADAPTERS = {
   "claude-code": { module: "../adapters/claude-code.mjs", fn: "translate", stdin: true },
@@ -64,8 +65,10 @@ async function main() {
 
   const lines = events.map((event) => JSON.stringify(event)).join("\n") + "\n";
 
+  // homedir() (not process.env.HOME) resolves correctly on Windows too, where
+  // HOME is unset and the home path lives in USERPROFILE.
   const eventsFile =
-    process.env.FLEET_EVENTS_FILE || `${process.env.HOME}/.agenticade/events.jsonl`;
+    process.env.FLEET_EVENTS_FILE || join(homedir(), ".agenticade", "events.jsonl");
 
   mkdirSync(dirname(eventsFile), { recursive: true });
   appendFileSync(eventsFile, lines);

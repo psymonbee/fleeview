@@ -169,6 +169,32 @@ describe("bin/install.mjs — pre-existing settings with sentinel keys", () => {
       rmSync(home, { recursive: true, force: true });
     }
   });
+
+  test("backup filename is Windows-safe — no reserved chars from the ISO timestamp", () => {
+    const home = makeScratchHome();
+    try {
+      mkdirSync(join(home, ".claude"), { recursive: true });
+      writeFileSync(settingsPath(home), JSON.stringify({ theme: "dark" }, null, 2));
+
+      const result = runInstaller(home);
+      assert.equal(result.status, 0, `stderr: ${result.stderr}`);
+
+      const backups = backupFiles(home);
+      assert.equal(backups.length, 1, "exactly one backup written");
+      // Windows forbids < > : " / \ | ? * in filenames. A raw ISO timestamp
+      // carries colons (2026-07-20T19:47:19.747Z), so an unsanitized backup
+      // name makes writeFileSync throw ENOENT on Windows — aborting the install
+      // before any hooks are wired. Assert the sanitized name stays portable.
+      assert.doesNotMatch(
+        backups[0],
+        /[<>:"/\\|?*]/,
+        `backup filename carries a Windows-reserved char: ${backups[0]}`
+      );
+      assert.ok(backups[0].includes("fleetview-backup"), "still a recognizable backup name");
+    } finally {
+      rmSync(home, { recursive: true, force: true });
+    }
+  });
 });
 
 describe("bin/install.mjs — idempotency", () => {
