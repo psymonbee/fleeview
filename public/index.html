@@ -19,6 +19,18 @@
       --done: #7BC47F;
       --error: #E5484D;
       --amber: #E8A23D;
+
+      /* agenticADE brand — see brand/README.md */
+      --brand: #E11D6B;        /* Cherryade crimson — primary accent */
+      --brand-2: #FF5C8A;      /* Fizz pink — highlight / active */
+      /* warm charcoal chrome (top bar + rail) to match the brand's dark surface */
+      --chrome-surface: rgba(23,22,28,.85);
+      --chrome-surface-2: rgba(23,22,28,.55);
+      --chrome-inset: rgba(18,17,23,.92);
+      --chrome-line: rgba(237,233,242,.10);
+      --chrome-line-2: rgba(237,233,242,.16);
+      --chrome-edge: color-mix(in srgb, var(--brand) 20%, rgba(237,233,242,.08));
+
       --radius: 16px;
       --shadow: 0 4px 24px rgba(0,0,0,.35);
       --font: -apple-system, "SF Pro Text", Segoe UI, system-ui, sans-serif;
@@ -61,8 +73,8 @@
       gap: 16px;
       height: 48px;
       padding: 0 18px;
-      border-bottom: 1px solid rgba(35,43,56,.85);
-      background: rgba(10,12,16,.84);
+      border-bottom: 1px solid var(--chrome-edge);
+      background: var(--chrome-surface);
       backdrop-filter: blur(16px);
     }
 
@@ -100,9 +112,9 @@
     .chip {
       height: 26px;
       padding: 0 10px;
-      border: 1px solid rgba(35,43,56,.95);
+      border: 1px solid var(--chrome-line-2);
       border-radius: 999px;
-      background: rgba(21,26,35,.82);
+      background: var(--chrome-inset);
       color: var(--muted);
       font-size: 12px;
       white-space: nowrap;
@@ -118,9 +130,9 @@
       /* §32.4: session titles are wordier than the old cwd · id8 label. */
       width: min(320px, 38vw);
       height: 28px;
-      border: 1px solid rgba(35,43,56,.95);
+      border: 1px solid var(--chrome-line-2);
       border-radius: 9px;
-      background: #10141B;
+      background: var(--chrome-inset);
       color: var(--text);
       padding: 0 30px 0 10px;
       font-size: 12px;
@@ -128,8 +140,8 @@
     }
 
     select:focus {
-      border-color: rgba(25,194,157,.55);
-      box-shadow: 0 0 0 3px rgba(25,194,157,.12);
+      border-color: color-mix(in srgb, var(--brand) 55%, transparent);
+      box-shadow: 0 0 0 3px color-mix(in srgb, var(--brand) 18%, transparent);
     }
 
     .bell {
@@ -138,9 +150,9 @@
       place-items: center;
       width: 28px;
       height: 28px;
-      border: 1px solid rgba(35,43,56,.95);
+      border: 1px solid var(--chrome-line-2);
       border-radius: 9px;
-      background: #10141B;
+      background: var(--chrome-inset);
       color: var(--muted);
       cursor: pointer;
       padding: 0;
@@ -150,6 +162,11 @@
        reset-layout button (§32.3) needs this to actually hide. */
     .bell[hidden] {
       display: none;
+    }
+
+    .bell:not(.on):not(:disabled):hover {
+      color: var(--brand-2);
+      border-color: color-mix(in srgb, var(--brand) 42%, var(--chrome-line-2));
     }
 
     .bell svg {
@@ -208,13 +225,15 @@
     }
 
     .rail {
+      --rail-accent: var(--brand);
+      --rail-accent-2: var(--brand-2);
       flex: 0 0 auto;
       display: flex;
       flex-direction: column;
       width: 248px;
       min-height: 0;
-      border-right: 1px solid rgba(35,43,56,.85);
-      background: rgba(13,16,22,.55);
+      border-right: 1px solid var(--chrome-edge);
+      background: var(--chrome-surface-2);
       transition: width .22s ease;
     }
 
@@ -229,7 +248,7 @@
       justify-content: space-between;
       height: 40px;
       padding: 0 12px;
-      border-bottom: 1px solid rgba(35,43,56,.85);
+      border-bottom: 1px solid var(--chrome-line);
     }
 
     .rail.collapsed .rail-head {
@@ -256,7 +275,7 @@
       flex: 0 0 auto;
       width: 22px;
       height: 22px;
-      border: 1px solid rgba(35,43,56,.95);
+      border: 1px solid var(--chrome-line-2);
       border-radius: 6px;
       background: transparent;
       color: var(--muted);
@@ -264,6 +283,11 @@
       font-size: 12px;
       line-height: 1;
       padding: 0;
+    }
+
+    .rail-toggle:hover {
+      color: var(--rail-accent-2);
+      border-color: color-mix(in srgb, var(--rail-accent) 45%, var(--chrome-line-2));
     }
 
     .rail-body {
@@ -296,7 +320,7 @@
     }
 
     .rail-dot.active {
-      background: var(--openai);
+      background: var(--rail-accent-2);
       animation: railPulse 1.4s ease-in-out infinite;
     }
 
@@ -1228,7 +1252,7 @@
       flex: 0 0 auto;
       width: 22px;
       height: 22px;
-      border: 1px solid rgba(35,43,56,.95);
+      border: 1px solid var(--chrome-line-2);
       border-radius: 6px;
       background: transparent;
       color: var(--muted);
@@ -1242,8 +1266,8 @@
     }
 
     .rail-expand:hover {
-      color: var(--anthropic);
-      border-color: color-mix(in srgb, var(--anthropic) 45%, rgba(35,43,56,.95));
+      color: var(--rail-accent-2);
+      border-color: color-mix(in srgb, var(--rail-accent) 45%, var(--chrome-line-2));
     }
 
     .rail.collapsed .rail-expand {
@@ -1270,8 +1294,8 @@
       width: 18px;
       height: 18px;
       border-radius: 6px;
-      color: var(--anthropic);
-      background: color-mix(in srgb, var(--anthropic) 16%, transparent);
+      color: var(--rail-accent);
+      background: color-mix(in srgb, var(--rail-accent) 16%, transparent);
     }
 
     .rail-glyph svg { width: 11px; height: 11px; }
@@ -1288,7 +1312,7 @@
       align-items: flex-start;
       margin: 13px 0 5px;
       padding-left: 9px;
-      border-left: 2px solid color-mix(in srgb, var(--anthropic) 65%, transparent);
+      border-left: 2px solid color-mix(in srgb, var(--rail-accent) 65%, transparent);
     }
 
     .rail-outline > .rail-sec:first-child { margin-top: 0; }
@@ -1319,7 +1343,7 @@
     }
 
     .rail-sec.sub {
-      border-left-color: color-mix(in srgb, var(--anthropic) 28%, var(--border));
+      border-left-color: color-mix(in srgb, var(--rail-accent) 28%, var(--border));
       margin-top: 9px;
     }
 
@@ -1348,7 +1372,7 @@
       width: 4px;
       height: 4px;
       border-radius: 50%;
-      background: color-mix(in srgb, var(--anthropic) 60%, var(--muted));
+      background: color-mix(in srgb, var(--rail-accent) 60%, var(--muted));
     }
 
     .rail-check {
@@ -1398,10 +1422,10 @@
       gap: 7px;
       height: 32px;
       padding: 0 10px;
-      border: 1px solid color-mix(in srgb, var(--anthropic) 30%, var(--border));
+      border: 1px solid color-mix(in srgb, var(--rail-accent) 30%, var(--border));
       border-radius: 9px;
-      background: color-mix(in srgb, var(--anthropic) 9%, transparent);
-      color: var(--anthropic);
+      background: color-mix(in srgb, var(--rail-accent) 9%, transparent);
+      color: var(--rail-accent);
       font-family: var(--font);
       font-size: 11.5px;
       font-weight: 600;
@@ -1410,8 +1434,8 @@
     }
 
     .rail-open:hover {
-      background: color-mix(in srgb, var(--anthropic) 18%, transparent);
-      border-color: color-mix(in srgb, var(--anthropic) 55%, transparent);
+      background: color-mix(in srgb, var(--rail-accent) 18%, transparent);
+      border-color: color-mix(in srgb, var(--rail-accent) 55%, transparent);
     }
 
     .rail-open svg { width: 13px; height: 13px; }
