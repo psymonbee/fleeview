@@ -309,7 +309,7 @@ The reducer silently skips lines with `v !== 1`, unknown `kind`, or failed
 | `agent.activity` | `agentId`, `phase`: `"start"`\|`"end"`, `callId?`, `tool`, `hint?` (≤120), `file?`, `error?` (bool), `ms?` (duration, phase end only) |
 | `agent.end` | `agentId` (string \| null), `agentType?` (used for null-id pairing), `finalMessage?` (≤300), `transcriptPath?` |
 | `plan.step` | `stepId`, `subject?` (≤200), `status?` (`pending`\|`active`\|`done`), `deleted?` (bool) — upsert semantics, only present fields change |
-| `plan.doc` | `markdown` (≤4000) |
+| `plan.doc` | `markdown` (≤20000) |
 
 `transcriptPath` is deliberately carried (v2 reducer ignores it) so a future
 token/cost enricher can tail transcripts. `permission_mode` / `effort` /
@@ -371,7 +371,8 @@ Mapping (anything not listed → `[]`):
   `pending→pending, in_progress→active, completed→done`, and
   `tool_input.status === "deleted"` → `deleted: true`. No mappable field → `[]`.
 - `PreToolUse` `ExitPlanMode` → `plan.doc {markdown:
-  truncate(tool_input.plan, 4000)}`.
+  truncate(tool_input.plan, 20000)}` (20k so the full plan reaches the §33
+  rendered plan view unclipped).
 
 ### Hook rewrite — `hooks/emit-event.mjs` (~45 lines)
 

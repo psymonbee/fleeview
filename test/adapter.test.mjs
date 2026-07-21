@@ -270,8 +270,8 @@ describe("adapters/claude-code.mjs — truncation", () => {
     assert.ok(event.hint.endsWith("…"));
   });
 
-  test("plan.doc markdown truncated at 4000 chars with … suffix", () => {
-    const longPlan = "z".repeat(5000);
+  test("plan.doc markdown truncated at 20000 chars with … suffix", () => {
+    const longPlan = "z".repeat(21000);
     const payload = {
       session_id: "s1",
       hook_event_name: "PreToolUse",
@@ -279,7 +279,7 @@ describe("adapters/claude-code.mjs — truncation", () => {
       tool_input: { plan: longPlan },
     };
     const [event] = translate(payload);
-    assert.equal(event.markdown.length, 4001);
+    assert.equal(event.markdown.length, 20001);
     assert.ok(event.markdown.endsWith("…"));
   });
 

@@ -1215,6 +1215,560 @@
         width: 320px;
       }
     }
+
+    /* --- plan rail affordances (§33) ------------------------------------ */
+    .rail-head-actions {
+      flex: 0 0 auto;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .rail-expand {
+      flex: 0 0 auto;
+      width: 22px;
+      height: 22px;
+      border: 1px solid rgba(35,43,56,.95);
+      border-radius: 6px;
+      background: transparent;
+      color: var(--muted);
+      cursor: pointer;
+      font-size: 12px;
+      line-height: 1;
+      padding: 0;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .rail-expand:hover {
+      color: var(--anthropic);
+      border-color: color-mix(in srgb, var(--anthropic) 45%, rgba(35,43,56,.95));
+    }
+
+    .rail.collapsed .rail-expand {
+      display: none;
+    }
+
+    .rail-body.clickable {
+      cursor: pointer;
+    }
+
+    /* rail header identity glyph */
+    .rail-title-wrap {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      min-width: 0;
+      overflow: hidden;
+    }
+
+    .rail-glyph {
+      flex: 0 0 auto;
+      display: grid;
+      place-items: center;
+      width: 18px;
+      height: 18px;
+      border-radius: 6px;
+      color: var(--anthropic);
+      background: color-mix(in srgb, var(--anthropic) 16%, transparent);
+    }
+
+    .rail-glyph svg { width: 11px; height: 11px; }
+    .rail.collapsed .rail-title-wrap { display: none; }
+
+    /* rail plan outline (§33) */
+    .rail-outline {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .rail-sec {
+      display: flex;
+      align-items: flex-start;
+      margin: 13px 0 5px;
+      padding-left: 9px;
+      border-left: 2px solid color-mix(in srgb, var(--anthropic) 65%, transparent);
+    }
+
+    .rail-outline > .rail-sec:first-child { margin-top: 0; }
+
+    .rail-sec-text {
+      overflow: hidden;
+      color: var(--text);
+      font-size: 11.5px;
+      font-weight: 700;
+      line-height: 1.3;
+      letter-spacing: .01em;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+    }
+
+    .rail-sec.title {
+      margin: 0 0 9px;
+      padding: 0 0 10px;
+      border-left: 0;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .rail-sec.title .rail-sec-text {
+      font-size: 13px;
+      letter-spacing: 0;
+      color: var(--text);
+    }
+
+    .rail-sec.sub {
+      border-left-color: color-mix(in srgb, var(--anthropic) 28%, var(--border));
+      margin-top: 9px;
+    }
+
+    .rail-sec.sub .rail-sec-text {
+      color: var(--muted);
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: .06em;
+      text-transform: uppercase;
+    }
+
+    .rail-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      margin: 4px 0;
+      padding-left: 11px;
+    }
+
+    .rail-item.depth1 { padding-left: 24px; }
+    .rail-item.depth2 { padding-left: 37px; }
+
+    .rail-bullet {
+      flex: 0 0 auto;
+      margin-top: 6px;
+      width: 4px;
+      height: 4px;
+      border-radius: 50%;
+      background: color-mix(in srgb, var(--anthropic) 60%, var(--muted));
+    }
+
+    .rail-check {
+      flex: 0 0 auto;
+      margin-top: 1px;
+      width: 13px;
+      height: 13px;
+      border-radius: 4px;
+      border: 1.4px solid var(--border);
+      display: grid;
+      place-items: center;
+      font-size: 8px;
+      line-height: 1;
+      color: transparent;
+    }
+
+    .rail-check.done {
+      border-color: var(--done);
+      color: var(--done);
+      background: color-mix(in srgb, var(--done) 16%, transparent);
+    }
+
+    .rail-item-text {
+      flex: 1 1 auto;
+      min-width: 0;
+      overflow: hidden;
+      color: rgba(230,234,242,.78);
+      font-size: 11.5px;
+      line-height: 1.35;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+    }
+
+    .rail-item-text.done {
+      color: var(--muted);
+      text-decoration: line-through;
+    }
+
+    .rail-open {
+      flex: 0 0 auto;
+      margin-top: 14px;
+      width: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 7px;
+      height: 32px;
+      padding: 0 10px;
+      border: 1px solid color-mix(in srgb, var(--anthropic) 30%, var(--border));
+      border-radius: 9px;
+      background: color-mix(in srgb, var(--anthropic) 9%, transparent);
+      color: var(--anthropic);
+      font-family: var(--font);
+      font-size: 11.5px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background .15s ease, border-color .15s ease;
+    }
+
+    .rail-open:hover {
+      background: color-mix(in srgb, var(--anthropic) 18%, transparent);
+      border-color: color-mix(in srgb, var(--anthropic) 55%, transparent);
+    }
+
+    .rail-open svg { width: 13px; height: 13px; }
+
+    /* --- plan modal (§33) ----------------------------------------------- */
+    .plan-modal {
+      position: fixed;
+      inset: 0;
+      z-index: 40;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: clamp(12px, 4vw, 40px);
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity .2s ease;
+    }
+
+    .plan-modal.open {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    .plan-backdrop {
+      position: absolute;
+      inset: 0;
+      background: rgba(6,8,12,.62);
+      backdrop-filter: blur(6px);
+    }
+
+    .plan-panel {
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      width: min(800px, 100%);
+      max-height: min(86vh, 940px);
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      box-shadow: 0 24px 64px rgba(0,0,0,.55), var(--shadow);
+      transform: translateY(10px) scale(.99);
+      transition: transform .22s cubic-bezier(.2,.8,.2,1);
+      overflow: hidden;
+    }
+
+    .plan-modal.open .plan-panel {
+      transform: none;
+    }
+
+    .plan-head {
+      flex: 0 0 auto;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 15px 16px;
+      border-bottom: 1px solid var(--border);
+      background: linear-gradient(180deg, color-mix(in srgb, var(--anthropic) 9%, transparent), transparent);
+    }
+
+    .plan-glyph {
+      flex: 0 0 auto;
+      display: grid;
+      place-items: center;
+      width: 30px;
+      height: 30px;
+      border-radius: 9px;
+      color: var(--anthropic);
+      background: color-mix(in srgb, var(--anthropic) 16%, transparent);
+    }
+
+    .plan-glyph svg {
+      width: 18px;
+      height: 18px;
+    }
+
+    .plan-heading {
+      flex: 1 1 auto;
+      min-width: 0;
+    }
+
+    .plan-title {
+      font-size: 15px;
+      font-weight: 700;
+    }
+
+    .plan-sub {
+      margin-top: 2px;
+      overflow: hidden;
+      color: var(--muted);
+      font-family: var(--mono);
+      font-size: 11px;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .plan-btn {
+      flex: 0 0 auto;
+      height: 28px;
+      padding: 0 11px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: transparent;
+      color: var(--muted);
+      cursor: pointer;
+      font-size: 11.5px;
+      font-weight: 600;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition: color .15s ease, border-color .15s ease, background .15s ease;
+    }
+
+    .plan-btn:hover {
+      color: var(--text);
+      border-color: color-mix(in srgb, var(--anthropic) 45%, var(--border));
+    }
+
+    .plan-btn.on {
+      color: var(--anthropic);
+      border-color: color-mix(in srgb, var(--anthropic) 45%, transparent);
+      background: color-mix(in srgb, var(--anthropic) 12%, transparent);
+    }
+
+    .plan-btn[hidden] {
+      display: none;
+    }
+
+    .plan-close {
+      flex: 0 0 auto;
+      width: 28px;
+      height: 28px;
+      padding: 0;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: transparent;
+      color: var(--muted);
+      cursor: pointer;
+      font-size: 12px;
+    }
+
+    .plan-close:hover {
+      color: var(--text);
+    }
+
+    .plan-body {
+      flex: 1 1 auto;
+      min-height: 0;
+      overflow-y: auto;
+      padding: 22px 28px 30px;
+    }
+
+    .plan-empty {
+      color: var(--muted);
+      font-style: italic;
+    }
+
+    /* --- rendered markdown (.md) ---------------------------------------- */
+    .md {
+      color: var(--text);
+      font-size: 14px;
+      line-height: 1.62;
+      word-wrap: break-word;
+      overflow-wrap: break-word;
+    }
+
+    .md > *:first-child { margin-top: 0; }
+    .md > *:last-child { margin-bottom: 0; }
+
+    .md h1, .md h2, .md h3, .md h4, .md h5, .md h6 {
+      margin: 1.5em 0 .6em;
+      line-height: 1.25;
+      font-weight: 700;
+    }
+
+    .md h1 {
+      font-size: 1.5em;
+      padding-bottom: .3em;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .md h2 {
+      font-size: 1.28em;
+      padding-bottom: .24em;
+      border-bottom: 1px solid color-mix(in srgb, var(--border) 65%, transparent);
+    }
+
+    .md h3 { font-size: 1.12em; }
+    .md h4 { font-size: 1em; }
+
+    .md h5, .md h6 {
+      font-size: .86em;
+      color: var(--muted);
+      letter-spacing: .04em;
+      text-transform: uppercase;
+    }
+
+    .md p { margin: .7em 0; }
+
+    .md a {
+      color: var(--anthropic);
+      text-decoration: none;
+      border-bottom: 1px solid color-mix(in srgb, var(--anthropic) 40%, transparent);
+    }
+
+    .md a:hover { border-bottom-color: var(--anthropic); }
+
+    .md strong { font-weight: 700; color: #f2f5fb; }
+    .md em { font-style: italic; }
+    .md del { opacity: .55; }
+
+    .md ul, .md ol {
+      margin: .6em 0;
+      padding-left: 1.5em;
+    }
+
+    .md li { margin: .3em 0; }
+    .md li::marker { color: var(--muted); }
+    .md ul { list-style: disc; }
+    .md ol { list-style: decimal; }
+    .md li > ul, .md li > ol { margin: .3em 0; }
+    .md .md-li-body ul, .md .md-li-body ol { margin: .3em 0; }
+
+    /* task-list items */
+    .md li.md-task {
+      list-style: none;
+      margin-left: -1.5em;
+      padding-left: 0;
+      display: flex;
+      gap: .55em;
+      align-items: flex-start;
+    }
+
+    .md .md-li-body {
+      flex: 1 1 auto;
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .md .md-check {
+      flex: 0 0 auto;
+      margin-top: .18em;
+      width: 15px;
+      height: 15px;
+      border-radius: 4px;
+      border: 1.5px solid var(--border);
+      display: grid;
+      place-items: center;
+      font-size: 10px;
+      line-height: 1;
+      color: transparent;
+    }
+
+    .md .md-check.done {
+      border-color: var(--done);
+      color: var(--done);
+      background: color-mix(in srgb, var(--done) 16%, transparent);
+    }
+
+    .md .md-check.active {
+      border-color: var(--openai);
+      color: var(--openai);
+      background: color-mix(in srgb, var(--openai) 14%, transparent);
+    }
+
+    .md .md-li-text { flex: 1 1 auto; min-width: 0; }
+
+    .md code {
+      font-family: var(--mono);
+      font-size: .88em;
+      background: rgba(255,255,255,.07);
+      border: 1px solid var(--border);
+      border-radius: 5px;
+      padding: .08em .38em;
+    }
+
+    .md pre.md-pre {
+      position: relative;
+      margin: .95em 0;
+      padding: 13px 15px;
+      background: #0c0f15;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      overflow-x: auto;
+    }
+
+    .md pre.md-pre code {
+      background: none;
+      border: 0;
+      border-radius: 0;
+      padding: 0;
+      font-size: 12.5px;
+      line-height: 1.55;
+      color: #d7dce6;
+      white-space: pre;
+    }
+
+    .md pre.md-pre[data-lang]::before {
+      content: attr(data-lang);
+      position: absolute;
+      top: 8px;
+      right: 12px;
+      font-family: var(--mono);
+      font-size: 9.5px;
+      font-weight: 700;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+      color: var(--muted);
+      pointer-events: none;
+    }
+
+    .md blockquote {
+      margin: .95em 0;
+      padding: .1em 0 .1em 14px;
+      border-left: 3px solid color-mix(in srgb, var(--anthropic) 55%, var(--border));
+      color: rgba(230,234,242,.82);
+    }
+
+    .md blockquote p { margin: .35em 0; }
+
+    .md hr {
+      margin: 1.4em 0;
+      border: 0;
+      height: 1px;
+      background: var(--border);
+    }
+
+    .md .md-table-wrap {
+      overflow-x: auto;
+      margin: 1em 0;
+    }
+
+    .md table {
+      border-collapse: collapse;
+      width: 100%;
+      font-size: 13px;
+    }
+
+    .md th, .md td {
+      padding: 7px 12px;
+      border: 1px solid var(--border);
+      text-align: left;
+    }
+
+    .md th {
+      background: rgba(255,255,255,.04);
+      font-weight: 700;
+    }
+
+    .md tbody tr:nth-child(even) td {
+      background: rgba(255,255,255,.015);
+    }
+
+    .md img {
+      max-width: 100%;
+      border-radius: 8px;
+    }
   </style>
 </head>
 <body>
@@ -1229,6 +1783,13 @@
         <select id="sessionPicker" aria-label="Session">
           <option value="__latest">Follow latest</option>
         </select>
+        <button class="bell" id="planOpen" type="button" hidden aria-label="Open plan" title="Open plan">
+          <svg viewBox="0 0 16 16" aria-hidden="true">
+            <path d="M4.2 2.6h5l3.1 3.1v7.5a.8.8 0 0 1-.8.8H4.2a.8.8 0 0 1-.8-.8V3.4a.8.8 0 0 1 .8-.8Z"></path>
+            <path d="M9 2.7v3.1h3.1"></path>
+            <path d="M5.9 8.6h4.2M5.9 10.9h4.2"></path>
+          </svg>
+        </button>
         <button class="bell" id="resetLayout" type="button" hidden aria-label="Reset card layout" title="Reset card layout">
           <svg viewBox="0 0 16 16" aria-hidden="true">
             <path d="M13.2 8a5.2 5.2 0 1 1-1.6-3.75"></path>
@@ -1251,10 +1812,21 @@
     <div class="layout" id="layout">
       <aside class="rail" id="rail" aria-label="Plan">
         <div class="rail-head">
-          <span class="rail-title">Plan</span>
-          <button class="rail-toggle" id="railToggle" type="button" aria-label="Collapse plan rail">‹</button>
+          <span class="rail-title-wrap">
+            <span class="rail-glyph" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                <circle cx="12" cy="12" r="8.5"></circle>
+                <circle cx="12" cy="12" r="2.2" fill="currentColor" stroke="none"></circle>
+              </svg>
+            </span>
+            <span class="rail-title">Plan</span>
+          </span>
+          <div class="rail-head-actions">
+            <button class="rail-expand" id="railExpand" type="button" aria-label="Open full plan" title="Open full plan">⤢</button>
+            <button class="rail-toggle" id="railToggle" type="button" aria-label="Collapse plan rail">‹</button>
+          </div>
         </div>
-        <div class="rail-body" id="railBody"></div>
+        <div class="rail-body" id="railBody" title="Open full plan"></div>
       </aside>
 
       <main class="canvas" id="canvas">
@@ -1314,6 +1886,28 @@
         </div>
       </aside>
     </div>
+
+    <div class="plan-modal" id="planModal" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="planTitle">
+      <div class="plan-backdrop" id="planBackdrop"></div>
+      <div class="plan-panel" role="document">
+        <div class="plan-head">
+          <span class="plan-glyph" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6">
+              <circle cx="12" cy="12" r="8.5"></circle>
+              <circle cx="12" cy="12" r="2.2" fill="currentColor" stroke="none"></circle>
+            </svg>
+          </span>
+          <div class="plan-heading">
+            <div class="plan-title" id="planTitle">Plan</div>
+            <div class="plan-sub" id="planSub"></div>
+          </div>
+          <button class="plan-btn" id="planAutoToggle" type="button" aria-pressed="true" title="Auto-open new plans as they're created">Auto-open</button>
+          <button class="plan-btn" id="planCopy" type="button" title="Copy plan markdown">Copy</button>
+          <button class="plan-close" id="planClose" type="button" aria-label="Close plan">✕</button>
+        </div>
+        <div class="plan-body md" id="planBody"></div>
+      </div>
+    </div>
   </div>
 
   <script>
@@ -1363,7 +1957,16 @@
         // the auto slot at paint time only — the card keeps its slot in the
         // stack, so dragging one card never shifts another.
         manual: new Map(),
-        manualSessionId: null
+        manualSessionId: null,
+        // §33: plan-doc viewer. seenPlanDocs tracks the last plan.doc string
+        // observed per session so auto-open fires once per genuinely-new plan
+        // (a plan.step update re-broadcasts the same doc — that must not
+        // re-pop the modal). planModalSessionId/planModalDoc pin the modal to
+        // one session and its currently-rendered markdown so renderAll never
+        // re-parses an unchanged doc.
+        seenPlanDocs: new Map(),
+        planModalSessionId: null,
+        planModalDoc: null
       };
       const els = {
         layout: document.getElementById("layout"),
@@ -1406,7 +2009,17 @@
         drawerTokensCost: document.getElementById("drawerTokensCost"),
         drawerFinal: document.getElementById("drawerFinal"),
         drawerLog: document.getElementById("drawerLog"),
-        drawerClose: document.getElementById("drawerClose")
+        drawerClose: document.getElementById("drawerClose"),
+        planOpen: document.getElementById("planOpen"),
+        railExpand: document.getElementById("railExpand"),
+        planModal: document.getElementById("planModal"),
+        planBackdrop: document.getElementById("planBackdrop"),
+        planTitle: document.getElementById("planTitle"),
+        planSub: document.getElementById("planSub"),
+        planBody: document.getElementById("planBody"),
+        planAutoToggle: document.getElementById("planAutoToggle"),
+        planCopy: document.getElementById("planCopy"),
+        planClose: document.getElementById("planClose")
       };
       const nodes = new Map();
       const paths = new Map();
@@ -1591,17 +2204,426 @@
         return session ? state.plans.get(session.id) || null : null;
       }
 
+      // Flatten inline markdown to plain text for the compact rail peek
+      // (the full-fidelity render lives in the plan modal, §33).
+      function stripInlineMd(text) {
+        return String(text)
+          .replace(/`([^`]+)`/g, "$1")
+          .replace(/\*\*([^*]+)\*\*/g, "$1")
+          .replace(/__([^_]+)__/g, "$1")
+          .replace(/\*([^*]+)\*/g, "$1")
+          .replace(/~~([^~]+)~~/g, "$1")
+          .replace(/\[([^\]]+)\]\([^)]*\)/g, "$1");
+      }
+
+      // Rail peek: headings + list items, markers/checkboxes/inline markup
+      // stripped. Broader than the old list-only filter so a plan that leads
+      // with prose headings still shows something in the rail.
       function extractDocLines(markdown) {
         return String(markdown || "")
           .split("\n")
           .map(line => line.trim())
-          .filter(line => /^(-|\*|\d+\.)\s+/.test(line))
-          .map(line => line.replace(/^(-|\*|\d+\.)\s+/, ""));
+          .filter(line => /^(#{1,6}\s+|(-|\*|\+|\d+\.)\s+)/.test(line))
+          .map(line => line
+            .replace(/^#{1,6}\s+/, "")
+            .replace(/^(-|\*|\+|\d+\.)\s+/, "")
+            .replace(/^\[[ xX]\]\s+/, ""))
+          .map(stripInlineMd)
+          .filter(Boolean);
       }
 
       function stepIndex(plan, stepId) {
         if (!plan || !stepId) return -1;
         return (plan.steps || []).findIndex(step => step.id === stepId);
+      }
+
+      // --- markdown rendering (§33) -----------------------------------------
+      // A compact, dependency-free, XSS-safe Markdown -> DOM renderer. Every
+      // scrap of text reaches the page via textContent (never innerHTML), and
+      // link hrefs are scheme-checked, so a plan doc can contain arbitrary
+      // markup without becoming an injection vector. Supports: ATX headings,
+      // fenced code (with language tag), blockquotes, ordered/unordered lists
+      // with nesting + task-list checkboxes, GFM pipe tables, thematic breaks,
+      // and inline code/bold/italic/strike/links.
+
+      function mdEl(tag, className) {
+        const node = document.createElement(tag);
+        if (className) node.className = className;
+        return node;
+      }
+
+      function mdSafeUrl(url) {
+        const u = String(url || "").trim();
+        return /^(https?:|mailto:)/i.test(u) ? u : null;
+      }
+
+      const RE_LIST_ITEM = /^(\s*)([-*+]|\d{1,9}[.)])(\s+)(.*)$/;
+      const RE_HEADING = /^\s{0,3}(#{1,6})\s+(.*?)\s*#*\s*$/;
+      const RE_FENCE = /^(\s*)(`{3,}|~{3,})\s*([^`]*)$/;
+      const RE_HR = /^\s{0,3}([-*_])(?:\s*\1){2,}\s*$/;
+      const RE_QUOTE = /^\s{0,3}>/;
+      const RE_TABLE_SEP = /^\s*\|?\s*:?-{1,}:?\s*(\|\s*:?-{1,}:?\s*)*\|?\s*$/;
+
+      function listItemMatch(line) {
+        const m = RE_LIST_ITEM.exec(line);
+        if (!m) return null;
+        const indent = m[1].replace(/\t/g, "  ").length;
+        return { indent, marker: m[2], ordered: /\d/.test(m[2]), content: m[4] };
+      }
+
+      function isBlockInterrupt(line, next) {
+        if (line == null || /^\s*$/.test(line)) return true;
+        if (RE_HEADING.test(line)) return true;
+        if (RE_FENCE.test(line)) return true;
+        if (RE_HR.test(line)) return true;
+        if (RE_QUOTE.test(line)) return true;
+        if (RE_LIST_ITEM.test(line)) return true;
+        if (line.includes("|") && next && RE_TABLE_SEP.test(next)) return true;
+        return false;
+      }
+
+      // Inline pass: append formatted nodes for `text` into `parent`.
+      function renderInline(parent, text) {
+        const str = String(text);
+        const len = str.length;
+        let i = 0;
+        let buf = "";
+        const flush = () => {
+          if (buf) { parent.appendChild(document.createTextNode(buf)); buf = ""; }
+        };
+
+        while (i < len) {
+          const ch = str[i];
+
+          if (ch === "\\" && i + 1 < len) { buf += str[i + 1]; i += 2; continue; }
+
+          if (ch === "`") {
+            const m = /^(`+)([\s\S]*?)\1(?!`)/.exec(str.slice(i));
+            if (m) {
+              flush();
+              const code = mdEl("code");
+              code.textContent = m[2].replace(/^ (.*) $/, "$1");
+              parent.appendChild(code);
+              i += m[0].length;
+              continue;
+            }
+          }
+
+          if (ch === "[") {
+            const m = /^\[((?:\\.|[^\]])*)\]\(\s*(<[^>]*>|[^)\s]+)(?:\s+"[^"]*")?\s*\)/.exec(str.slice(i));
+            if (m) {
+              const href = mdSafeUrl(m[2].replace(/^<|>$/g, ""));
+              flush();
+              if (href) {
+                const a = mdEl("a");
+                a.href = href;
+                a.target = "_blank";
+                a.rel = "noopener noreferrer";
+                renderInline(a, m[1]);
+                parent.appendChild(a);
+              } else {
+                renderInline(parent, m[1]);
+              }
+              i += m[0].length;
+              continue;
+            }
+          }
+
+          if ((ch === "*" || ch === "_") && str.slice(i, i + 2) === ch + ch) {
+            const close = str.indexOf(ch + ch, i + 2);
+            if (close > i + 2) {
+              flush();
+              const strong = mdEl("strong");
+              renderInline(strong, str.slice(i + 2, close));
+              parent.appendChild(strong);
+              i = close + 2;
+              continue;
+            }
+          }
+
+          if (ch === "~" && str[i + 1] === "~") {
+            const close = str.indexOf("~~", i + 2);
+            if (close > i + 2) {
+              flush();
+              const del = mdEl("del");
+              renderInline(del, str.slice(i + 2, close));
+              parent.appendChild(del);
+              i = close + 2;
+              continue;
+            }
+          }
+
+          if (ch === "*" || ch === "_") {
+            // `_` emphasis is honoured only at word boundaries so identifiers
+            // like snake_case and __init__ survive intact; `*` is unrestricted.
+            const isUnderscore = ch === "_";
+            const prev = i > 0 ? str[i - 1] : " ";
+            if (!isUnderscore || /[\s([{"'~*]/.test(prev)) {
+              let j = i + 1;
+              let close = -1;
+              while (j < len) {
+                if (str[j] === "\\") { j += 2; continue; }
+                if (str[j] === ch && str[j - 1] !== ch && str[j + 1] !== ch) {
+                  const nxt = j + 1 < len ? str[j + 1] : " ";
+                  if (!isUnderscore || /[\s)\]}.,!?;:"'~*]/.test(nxt)) { close = j; break; }
+                }
+                j++;
+              }
+              if (close > i + 1) {
+                flush();
+                const em = mdEl("em");
+                renderInline(em, str.slice(i + 1, close));
+                parent.appendChild(em);
+                i = close + 1;
+                continue;
+              }
+            }
+          }
+
+          buf += ch;
+          i++;
+        }
+        flush();
+      }
+
+      function dedentLines(lines) {
+        let min = Infinity;
+        for (const l of lines) {
+          if (/^\s*$/.test(l)) continue;
+          const n = l.length - l.replace(/^\s+/, "").length;
+          if (n < min) min = n;
+        }
+        if (!isFinite(min) || min === 0) return lines.slice();
+        return lines.map(l => (/^\s*$/.test(l) ? l : l.slice(min)));
+      }
+
+      // Consumes one list item (its inline text plus any more-indented
+      // continuation/nested block lines) and returns the next line index.
+      // Nested lists and multi-paragraph items fall out of the recursive
+      // renderMarkdownInto on the dedented child block.
+      function appendListItem(lines, start, listEl) {
+        const first = listItemMatch(lines[start]);
+        const baseIndent = first.indent;
+        const li = mdEl("li");
+        let content = first.content;
+
+        const task = /^\[([ xX])\]\s+(.*)$/.exec(content);
+        // A task <li> is a flex row [checkbox | body]; its text and any nested
+        // blocks stack inside the body column so a sub-list indents *below* the
+        // text rather than becoming a third flex column beside it. A plain <li>
+        // hosts its inline text directly so `li::marker` still draws the bullet.
+        let textHost = li;
+        let childHost = li;
+        if (task) {
+          li.classList.add("md-task");
+          const checked = /[xX]/.test(task[1]);
+          const box = mdEl("span", "md-check" + (checked ? " done" : ""));
+          box.setAttribute("aria-hidden", "true");
+          if (checked) box.textContent = "✓";
+          li.appendChild(box);
+          const body = mdEl("div", "md-li-body");
+          li.appendChild(body);
+          textHost = mdEl("span", "md-li-text");
+          body.appendChild(textHost);
+          childHost = body;
+          content = task[2];
+        }
+        renderInline(textHost, content);
+
+        let i = start + 1;
+        const childLines = [];
+        while (i < lines.length) {
+          if (/^\s*$/.test(lines[i])) {
+            // A blank line stays with this item only when more-indented
+            // content follows (loose list / multi-paragraph item).
+            let k = i + 1;
+            while (k < lines.length && /^\s*$/.test(lines[k])) k++;
+            const follow = k < lines.length ? lines[k] : null;
+            const followIndent = follow ? follow.length - follow.replace(/^\s+/, "").length : 0;
+            if (follow && followIndent > baseIndent) { childLines.push(""); i++; continue; }
+            break;
+          }
+          const m = listItemMatch(lines[i]);
+          const indent = lines[i].length - lines[i].replace(/^\s+/, "").length;
+          if (m && m.indent <= baseIndent) break;      // sibling or outer item
+          if (indent <= baseIndent) break;             // dedented plain line
+          childLines.push(lines[i]);                   // nested / continuation
+          i++;
+        }
+
+        if (childLines.length) {
+          renderMarkdownInto(childHost, dedentLines(childLines).join("\n"), true);
+        }
+
+        listEl.appendChild(li);
+        return i;
+      }
+
+      function parseList(lines, start, parent) {
+        const first = listItemMatch(lines[start]);
+        const ordered = first.ordered;
+        const baseIndent = first.indent;
+        const listEl = mdEl(ordered ? "ol" : "ul", "md-list");
+        if (ordered) {
+          const n = parseInt(first.marker, 10);
+          if (n > 1) listEl.setAttribute("start", String(n));
+        }
+        let i = start;
+        while (i < lines.length) {
+          if (/^\s*$/.test(lines[i])) {
+            let k = i + 1;
+            while (k < lines.length && /^\s*$/.test(lines[k])) k++;
+            const nm = k < lines.length ? listItemMatch(lines[k]) : null;
+            if (nm && nm.indent >= baseIndent) { i = k; continue; }
+            break;
+          }
+          const m = listItemMatch(lines[i]);
+          // Siblings at baseIndent extend the list; anything shallower ends it.
+          // Deeper items were already swallowed by the previous item's child
+          // block, so they never surface here.
+          if (!m || m.indent !== baseIndent) break;
+          i = appendListItem(lines, i, listEl);
+        }
+        parent.appendChild(listEl);
+        return i;
+      }
+
+      function parseTable(lines, start, parent) {
+        const splitRow = row => {
+          let s = row.trim();
+          s = s.replace(/^\|/, "").replace(/\|$/, "");
+          const cells = [];
+          let cur = "";
+          for (let i = 0; i < s.length; i++) {
+            if (s[i] === "\\" && i + 1 < s.length) { cur += s[i] + s[i + 1]; i++; continue; }
+            if (s[i] === "|") { cells.push(cur); cur = ""; continue; }
+            cur += s[i];
+          }
+          cells.push(cur);
+          return cells.map(c => c.trim());
+        };
+
+        const headers = splitRow(lines[start]);
+        const aligns = splitRow(lines[start + 1]).map(spec => {
+          const l = spec.startsWith(":");
+          const r = spec.endsWith(":");
+          return l && r ? "center" : r ? "right" : l ? "left" : "";
+        });
+
+        const wrap = mdEl("div", "md-table-wrap");
+        const table = mdEl("table");
+        const thead = mdEl("thead");
+        const htr = mdEl("tr");
+        headers.forEach((h, idx) => {
+          const th = mdEl("th");
+          if (aligns[idx]) th.style.textAlign = aligns[idx];
+          renderInline(th, h);
+          htr.appendChild(th);
+        });
+        thead.appendChild(htr);
+        table.appendChild(thead);
+
+        const tbody = mdEl("tbody");
+        let i = start + 2;
+        while (i < lines.length && lines[i].includes("|") && !/^\s*$/.test(lines[i])) {
+          const cells = splitRow(lines[i]);
+          const tr = mdEl("tr");
+          for (let c = 0; c < headers.length; c++) {
+            const td = mdEl("td");
+            if (aligns[c]) td.style.textAlign = aligns[c];
+            renderInline(td, cells[c] || "");
+            tr.appendChild(td);
+          }
+          tbody.appendChild(tr);
+          i++;
+        }
+        table.appendChild(tbody);
+        wrap.appendChild(table);
+        parent.appendChild(wrap);
+        return i;
+      }
+
+      // Block pass. `nested` is set when rendering list-item children so a
+      // heading inside a list doesn't grow a giant top margin.
+      function renderMarkdownInto(container, markdown, nested) {
+        if (!nested) container.textContent = "";
+        const lines = String(markdown == null ? "" : markdown)
+          .replace(/\r\n?/g, "\n")
+          .split("\n");
+        let i = 0;
+
+        while (i < lines.length) {
+          const line = lines[i];
+
+          if (/^\s*$/.test(line)) { i++; continue; }
+
+          const fence = RE_FENCE.exec(line);
+          if (fence) {
+            const marker = fence[2][0];
+            const fenceLen = fence[2].length;
+            const lang = fence[3].trim();
+            const closer = new RegExp("^\\s*\\" + marker + "{" + fenceLen + ",}\\s*$");
+            i++;
+            const code = [];
+            while (i < lines.length && !closer.test(lines[i])) { code.push(lines[i]); i++; }
+            if (i < lines.length) i++; // consume closing fence
+            const pre = mdEl("pre", "md-pre");
+            if (lang) pre.setAttribute("data-lang", lang.split(/\s+/)[0]);
+            const codeEl = mdEl("code");
+            codeEl.textContent = code.join("\n");
+            pre.appendChild(codeEl);
+            container.appendChild(pre);
+            continue;
+          }
+
+          const heading = RE_HEADING.exec(line);
+          if (heading) {
+            const h = mdEl("h" + heading[1].length);
+            renderInline(h, heading[2]);
+            container.appendChild(h);
+            i++;
+            continue;
+          }
+
+          if (RE_HR.test(line)) { container.appendChild(mdEl("hr")); i++; continue; }
+
+          if (RE_QUOTE.test(line)) {
+            const quote = [];
+            while (i < lines.length && RE_QUOTE.test(lines[i])) {
+              quote.push(lines[i].replace(/^\s{0,3}>\s?/, ""));
+              i++;
+            }
+            const bq = mdEl("blockquote");
+            renderMarkdownInto(bq, quote.join("\n"), true);
+            container.appendChild(bq);
+            continue;
+          }
+
+          if (line.includes("|") && i + 1 < lines.length && RE_TABLE_SEP.test(lines[i + 1])) {
+            i = parseTable(lines, i, container);
+            continue;
+          }
+
+          if (RE_LIST_ITEM.test(line)) {
+            i = parseList(lines, i, container);
+            continue;
+          }
+
+          const para = [];
+          while (i < lines.length && !isBlockInterrupt(lines[i], lines[i + 1])) {
+            para.push(lines[i]);
+            i++;
+          }
+          const p = mdEl("p");
+          para.forEach((pl, idx) => {
+            const hard = /( {2,}|\\)$/.test(pl);
+            renderInline(p, pl.replace(/( {2,}|\\)\s*$/, ""));
+            if (idx < para.length - 1) {
+              p.appendChild(hard ? mdEl("br") : document.createTextNode(" "));
+            }
+          });
+          container.appendChild(p);
+        }
       }
 
       // --- stall / narrative --------------------------------------------------
@@ -1726,6 +2748,50 @@
 
       // --- plan rail --------------------------------------------------------
 
+      // Structured outline for the rail: headings become sections, list items
+      // (with task state + nesting depth) hang under them. Prose and code are
+      // skipped — the rail is a scannable table of contents, the modal is the
+      // full read.
+      function railOutline(markdown) {
+        const out = [];
+        const lines = String(markdown || "").replace(/\r\n?/g, "\n").split("\n");
+        let inFence = false;
+        for (const raw of lines) {
+          if (/^\s*(`{3,}|~{3,})/.test(raw)) { inFence = !inFence; continue; }
+          if (inFence) continue;
+          const h = /^\s{0,3}(#{1,6})\s+(.*?)\s*#*\s*$/.exec(raw);
+          if (h) {
+            out.push({ type: "heading", level: h[1].length, text: stripInlineMd(h[2]).trim() });
+            continue;
+          }
+          const li = /^(\s*)([-*+]|\d{1,9}[.)])\s+(.*)$/.exec(raw);
+          if (li) {
+            const indent = li[1].replace(/\t/g, "  ").length;
+            let text = li[3];
+            let checked = null;
+            const task = /^\[([ xX])\]\s+(.*)$/.exec(text);
+            if (task) { checked = /[xX]/.test(task[1]); text = task[2]; }
+            text = stripInlineMd(text).trim();
+            if (text) out.push({ type: "item", depth: Math.min(2, Math.floor(indent / 2)), text, checked });
+          }
+        }
+        return out;
+      }
+
+      function buildRailOpenButton() {
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "rail-open";
+        btn.innerHTML =
+          '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 2.5H3.2a.7.7 0 0 0-.7.7V13a.7.7 0 0 0 .7.7h9.6a.7.7 0 0 0 .7-.7v-2.8"></path><path d="M9.5 2.5H13.5V6.5"></path><path d="M13 3 7.5 8.5"></path></svg>';
+        btn.append(document.createTextNode("Open full plan"));
+        btn.addEventListener("click", event => {
+          event.stopPropagation();
+          openPlanModal();
+        });
+        return btn;
+      }
+
       function renderRail(session) {
         const plan = currentPlan(session);
         const narrow = window.innerWidth < 900;
@@ -1746,6 +2812,9 @@
         els.railToggle.setAttribute("aria-expanded", String(!collapsed));
 
         els.railBody.innerHTML = "";
+        // The whole peek opens the full plan modal (§33); the expand button in
+        // the head is the explicit affordance, but the rows invite the click.
+        els.railBody.classList.toggle("clickable", Boolean(plan.doc));
         const steps = plan.steps || [];
         if (steps.length) {
           steps.forEach((step, i) => {
@@ -1765,24 +2834,176 @@
             els.railBody.append(row);
           });
         } else if (plan.doc) {
-          extractDocLines(plan.doc).slice(0, 12).forEach(text => {
-            const row = document.createElement("div");
-            row.className = "rail-row";
-            const dot = document.createElement("span");
-            dot.className = "rail-dot pending";
-            const subject = document.createElement("span");
-            subject.className = "rail-subject";
-            subject.textContent = text;
-            row.append(dot, subject);
-            els.railBody.append(row);
+          const outline = railOutline(plan.doc).slice(0, 80);
+          const container = document.createElement("div");
+          container.className = "rail-outline";
+          outline.forEach(node => {
+            if (node.type === "heading") {
+              const row = document.createElement("div");
+              row.className = "rail-sec" + (node.level === 1 ? " title" : node.level >= 3 ? " sub" : "");
+              const text = document.createElement("span");
+              text.className = "rail-sec-text";
+              text.textContent = node.text;
+              row.append(text);
+              container.append(row);
+            } else {
+              const row = document.createElement("div");
+              row.className = `rail-item depth${node.depth}`;
+              if (node.checked !== null) {
+                const box = document.createElement("span");
+                box.className = "rail-check" + (node.checked ? " done" : "");
+                box.setAttribute("aria-hidden", "true");
+                if (node.checked) box.textContent = "✓";
+                row.append(box);
+              } else {
+                const bullet = document.createElement("span");
+                bullet.className = "rail-bullet";
+                row.append(bullet);
+              }
+              const text = document.createElement("span");
+              text.className = "rail-item-text" + (node.checked ? " done" : "");
+              text.textContent = node.text;
+              row.append(text);
+              container.append(row);
+            }
           });
+          if (!outline.length) {
+            const empty = document.createElement("div");
+            empty.className = "rail-item";
+            const text = document.createElement("span");
+            text.className = "rail-item-text";
+            text.textContent = "A plan is ready.";
+            empty.append(text);
+            container.append(empty);
+          }
+          els.railBody.append(container);
         }
+
+        // A doc always earns the explicit opener (steps mode included, when the
+        // session also has an ExitPlanMode doc behind the live tracker).
+        if (plan.doc) els.railBody.append(buildRailOpenButton());
       }
 
       els.railToggle.addEventListener("click", () => {
         const collapsed = localStorage.getItem("fleet.railCollapsed") === "1";
         localStorage.setItem("fleet.railCollapsed", collapsed ? "0" : "1");
         renderAll();
+      });
+
+      // --- plan modal (§33) -------------------------------------------------
+
+      function autoOpenEnabled() {
+        return localStorage.getItem("fleet.planAutoOpen") !== "0";
+      }
+
+      function planModalOpen() {
+        return els.planModal.classList.contains("open");
+      }
+
+      // Render steps as a checklist when a plan has structured steps but no
+      // ExitPlanMode doc (e.g. a TaskCreate/TaskUpdate-only plan).
+      function renderStepsInto(container, steps) {
+        container.textContent = "";
+        const ul = mdEl("ul", "md-list");
+        steps.forEach(step => {
+          const li = mdEl("li", "md-task");
+          const done = step.status === "done";
+          const active = step.status === "active";
+          const box = mdEl("span", "md-check" + (done ? " done" : active ? " active" : ""));
+          box.setAttribute("aria-hidden", "true");
+          if (done) box.textContent = "✓";
+          const text = mdEl("span", "md-li-text");
+          text.textContent = step.subject || "(untitled step)";
+          li.append(box, text);
+          ul.appendChild(li);
+        });
+        container.appendChild(ul);
+      }
+
+      function renderPlanModal() {
+        const sid = state.planModalSessionId;
+        const plan = sid ? state.plans.get(sid) : null;
+        const session = sid ? state.sessions.get(sid) : null;
+
+        els.planSub.textContent = session
+          ? sessionLabel(session, false)
+          : (sid ? String(sid).slice(0, 8) : "");
+
+        const on = autoOpenEnabled();
+        els.planAutoToggle.classList.toggle("on", on);
+        els.planAutoToggle.setAttribute("aria-pressed", String(on));
+
+        const doc = plan && plan.doc ? plan.doc : "";
+        if (doc) {
+          // Only re-parse when the markdown actually changed — renderAll and
+          // live plan/session broadcasts call through here constantly.
+          if (state.planModalDoc !== doc) {
+            renderMarkdownInto(els.planBody, doc);
+            state.planModalDoc = doc;
+          }
+          els.planCopy.hidden = false;
+        } else if (plan && (plan.steps || []).length) {
+          renderStepsInto(els.planBody, plan.steps);
+          state.planModalDoc = null;
+          els.planCopy.hidden = true;
+        } else {
+          els.planBody.textContent = "";
+          const empty = mdEl("p", "plan-empty");
+          empty.textContent = "No plan yet for this session.";
+          els.planBody.appendChild(empty);
+          state.planModalDoc = null;
+          els.planCopy.hidden = true;
+        }
+      }
+
+      function openPlanModal(sessionId) {
+        const sid = sessionId || (activeSession() && activeSession().id);
+        if (!sid) return;
+        state.planModalSessionId = sid;
+        state.planModalDoc = null; // force a fresh parse for the new target
+        els.planModal.classList.add("open");
+        els.planModal.setAttribute("aria-hidden", "false");
+        renderPlanModal();
+        els.planClose.focus();
+      }
+
+      function closePlanModal() {
+        state.planModalSessionId = null;
+        state.planModalDoc = null;
+        els.planModal.classList.remove("open");
+        els.planModal.setAttribute("aria-hidden", "true");
+      }
+
+      function copyPlanMarkdown() {
+        const sid = state.planModalSessionId;
+        const plan = sid ? state.plans.get(sid) : null;
+        const doc = plan && plan.doc ? plan.doc : "";
+        if (!doc || !navigator.clipboard || !navigator.clipboard.writeText) return;
+        navigator.clipboard.writeText(doc).then(() => {
+          const original = els.planCopy.textContent;
+          els.planCopy.textContent = "Copied";
+          els.planCopy.classList.add("on");
+          setTimeout(() => {
+            els.planCopy.textContent = original;
+            els.planCopy.classList.remove("on");
+          }, 1400);
+        }).catch(() => {});
+      }
+
+      els.planOpen.addEventListener("click", () => openPlanModal());
+      els.railExpand.addEventListener("click", event => {
+        event.stopPropagation();
+        openPlanModal();
+      });
+      els.railBody.addEventListener("click", () => {
+        if (currentPlan(activeSession())) openPlanModal();
+      });
+      els.planClose.addEventListener("click", closePlanModal);
+      els.planBackdrop.addEventListener("click", closePlanModal);
+      els.planCopy.addEventListener("click", copyPlanMarkdown);
+      els.planAutoToggle.addEventListener("click", () => {
+        localStorage.setItem("fleet.planAutoOpen", autoOpenEnabled() ? "0" : "1");
+        renderPlanModal();
       });
 
       // --- drawer -----------------------------------------------------------
@@ -1981,11 +3202,15 @@
 
       els.drawerClose.addEventListener("click", closeDrawer);
       document.addEventListener("keydown", event => {
-        if (event.key === "Escape" && state.drawerTarget) closeDrawer();
+        if (event.key !== "Escape") return;
+        // The plan modal sits above the drawer, so it wins the first Escape.
+        if (planModalOpen()) { closePlanModal(); return; }
+        if (state.drawerTarget) closeDrawer();
       });
       document.addEventListener("click", event => {
         if (!state.drawerTarget) return;
         if (els.drawer.contains(event.target)) return;
+        if (els.planModal.contains(event.target)) return;
         if (event.target.closest(".agent")) return;
         if (event.target.closest(".hub")) return;
         closeDrawer();
@@ -2052,6 +3277,14 @@
         (msg.plans || []).forEach(plan => {
           if (plan?.sessionId) state.plans.set(plan.sessionId, plan);
         });
+        // §33: seed seenPlanDocs from the snapshot so a page load or reconnect
+        // never re-pops the modal for a plan that already existed — only plans
+        // that arrive *after* this point count as newly created.
+        state.seenPlanDocs = new Map();
+        for (const plan of state.plans.values()) {
+          if (plan && plan.doc && plan.sessionId) state.seenPlanDocs.set(plan.sessionId, plan.doc);
+        }
+        closePlanModal();
         for (const session of state.sessions.values()) {
           state.prevTurnActive.set(session.id, Boolean(session.turnActive));
         }
@@ -2066,7 +3299,24 @@
 
       function applyFleet(msg) {
         if (msg.type === "plan" && msg.plan?.sessionId) {
-          state.plans.set(msg.plan.sessionId, msg.plan);
+          const sid = msg.plan.sessionId;
+          state.plans.set(sid, msg.plan);
+          // §33: auto-open the plan modal the first time a session's plan.doc
+          // appears or changes. plan.step updates re-broadcast the same doc, so
+          // we compare against the last doc seen and only pop on a real change.
+          const doc = msg.plan.doc || "";
+          const prevDoc = state.seenPlanDocs.get(sid) || "";
+          const docChanged = Boolean(doc) && doc !== prevDoc;
+          if (doc !== prevDoc) state.seenPlanDocs.set(sid, doc);
+          // Only steal focus for the session the user is actually watching:
+          // FOLLOW (latest) surfaces every new plan; a pinned session surfaces
+          // only its own — a background session's plan never interrupts.
+          const relevant = state.selected === FOLLOW || state.selected === sid;
+          if (docChanged && autoOpenEnabled() && relevant) {
+            openPlanModal(sid);
+          } else if (planModalOpen() && state.planModalSessionId === sid) {
+            renderPlanModal();
+          }
         }
         if (msg.type === "activity" && msg.agentId && msg.entry && drawerTargetIs("agent", msg.agentId)) {
           appendLogEntry(msg.entry);
@@ -2085,6 +3335,7 @@
           }
           state.prevTurnActive.set(msg.session.id, Boolean(msg.session.turnActive));
           if (drawerTargetIs("session", msg.session.id)) renderDrawerHeader();
+          if (planModalOpen() && state.planModalSessionId === msg.session.id) renderPlanModal();
         }
         if (msg.agent) {
           const errAt = msg.agent.lastErrorAt ? parseTime(msg.agent.lastErrorAt) : 0;
@@ -2170,6 +3421,10 @@
         const running = agents.filter(agent => agent.status === "running").length;
         els.running.textContent = `${running} running`;
         els.collisionChip.style.display = collisions.size > 0 ? "flex" : "none";
+        // §33: the top-bar Plan button is the always-visible manual opener —
+        // it survives the <900px breakpoint that hides the rail entirely.
+        const sessionPlan = session ? state.plans.get(session.id) : null;
+        els.planOpen.hidden = !(sessionPlan && (sessionPlan.doc || (sessionPlan.steps || []).length));
         els.hub.classList.toggle("active", Boolean(session?.turnActive));
         els.hub.classList.toggle("ended", Boolean(session?.ended));
         const hubTitle = state.config.hubTitle || "Orchestrator";
