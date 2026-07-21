@@ -3,7 +3,7 @@
 // parseFrontmatter/scanAgentDir (no server involved), and an integration
 // layer that boots the real server/server.mjs as a child process against a
 // scratch FLEET_EVENTS_FILE and a scratch HOME (never the live
-// ~/.lumenade/events.jsonl or ~/.claude/settings.json), on port 4856. That
+// ~/.agenticade/events.jsonl or ~/.claude/settings.json), on port 4856. That
 // mirrors test/reducer-usage.test.mjs's harness: drive the server by
 // appending neutral events to the events file and reading back the SSE
 // snapshot over HTTP.

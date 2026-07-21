@@ -3,7 +3,10 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>LumenADE Fleet View</title>
+  <title>agenticADE Fleet View</title>
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="icon" href="/favicon.ico" sizes="any">
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png">
   <style>
     :root {
       --bg: #0A0C10;
@@ -16,6 +19,18 @@
       --done: #7BC47F;
       --error: #E5484D;
       --amber: #E8A23D;
+
+      /* agenticADE brand — see brand/README.md */
+      --brand: #E11D6B;        /* Cherryade crimson — primary accent */
+      --brand-2: #FF5C8A;      /* Fizz pink — highlight / active */
+      /* warm charcoal chrome (top bar + rail) to match the brand's dark surface */
+      --chrome-surface: rgba(23,22,28,.85);
+      --chrome-surface-2: rgba(23,22,28,.55);
+      --chrome-inset: rgba(18,17,23,.92);
+      --chrome-line: rgba(237,233,242,.10);
+      --chrome-line-2: rgba(237,233,242,.16);
+      --chrome-edge: color-mix(in srgb, var(--brand) 20%, rgba(237,233,242,.08));
+
       --radius: 16px;
       --shadow: 0 4px 24px rgba(0,0,0,.35);
       --font: -apple-system, "SF Pro Text", Segoe UI, system-ui, sans-serif;
@@ -58,8 +73,8 @@
       gap: 16px;
       height: 48px;
       padding: 0 18px;
-      border-bottom: 1px solid rgba(35,43,56,.85);
-      background: rgba(10,12,16,.84);
+      border-bottom: 1px solid var(--chrome-edge);
+      background: var(--chrome-surface);
       backdrop-filter: blur(16px);
     }
 
@@ -83,25 +98,10 @@
       white-space: nowrap;
     }
 
-    .logo {
-      display: grid;
-      place-items: center;
-      width: 22px;
-      height: 22px;
-      border: 1px solid rgba(230,234,242,.16);
-      border-radius: 7px;
-      background: linear-gradient(145deg, rgba(217,119,87,.25), rgba(25,194,157,.18));
-      box-shadow: 0 0 24px rgba(25,194,157,.08);
-    }
-
-    .logo svg {
-      width: 13px;
-      height: 13px;
-      fill: none;
-      stroke: var(--text);
-      stroke-linecap: round;
-      stroke-linejoin: round;
-      stroke-width: 1.8;
+    .brandmark {
+      display: block;
+      height: 24px;
+      width: auto;
     }
 
     .controls {
@@ -112,9 +112,9 @@
     .chip {
       height: 26px;
       padding: 0 10px;
-      border: 1px solid rgba(35,43,56,.95);
+      border: 1px solid var(--chrome-line-2);
       border-radius: 999px;
-      background: rgba(21,26,35,.82);
+      background: var(--chrome-inset);
       color: var(--muted);
       font-size: 12px;
       white-space: nowrap;
@@ -130,9 +130,9 @@
       /* §32.4: session titles are wordier than the old cwd · id8 label. */
       width: min(320px, 38vw);
       height: 28px;
-      border: 1px solid rgba(35,43,56,.95);
+      border: 1px solid var(--chrome-line-2);
       border-radius: 9px;
-      background: #10141B;
+      background: var(--chrome-inset);
       color: var(--text);
       padding: 0 30px 0 10px;
       font-size: 12px;
@@ -140,8 +140,8 @@
     }
 
     select:focus {
-      border-color: rgba(25,194,157,.55);
-      box-shadow: 0 0 0 3px rgba(25,194,157,.12);
+      border-color: color-mix(in srgb, var(--brand) 55%, transparent);
+      box-shadow: 0 0 0 3px color-mix(in srgb, var(--brand) 18%, transparent);
     }
 
     .bell {
@@ -150,9 +150,9 @@
       place-items: center;
       width: 28px;
       height: 28px;
-      border: 1px solid rgba(35,43,56,.95);
+      border: 1px solid var(--chrome-line-2);
       border-radius: 9px;
-      background: #10141B;
+      background: var(--chrome-inset);
       color: var(--muted);
       cursor: pointer;
       padding: 0;
@@ -162,6 +162,11 @@
        reset-layout button (§32.3) needs this to actually hide. */
     .bell[hidden] {
       display: none;
+    }
+
+    .bell:not(.on):not(:disabled):hover {
+      color: var(--brand-2);
+      border-color: color-mix(in srgb, var(--brand) 42%, var(--chrome-line-2));
     }
 
     .bell svg {
@@ -220,13 +225,15 @@
     }
 
     .rail {
+      --rail-accent: var(--brand);
+      --rail-accent-2: var(--brand-2);
       flex: 0 0 auto;
       display: flex;
       flex-direction: column;
       width: 248px;
       min-height: 0;
-      border-right: 1px solid rgba(35,43,56,.85);
-      background: rgba(13,16,22,.55);
+      border-right: 1px solid var(--chrome-edge);
+      background: var(--chrome-surface-2);
       transition: width .22s ease;
     }
 
@@ -241,7 +248,7 @@
       justify-content: space-between;
       height: 40px;
       padding: 0 12px;
-      border-bottom: 1px solid rgba(35,43,56,.85);
+      border-bottom: 1px solid var(--chrome-line);
     }
 
     .rail.collapsed .rail-head {
@@ -268,7 +275,7 @@
       flex: 0 0 auto;
       width: 22px;
       height: 22px;
-      border: 1px solid rgba(35,43,56,.95);
+      border: 1px solid var(--chrome-line-2);
       border-radius: 6px;
       background: transparent;
       color: var(--muted);
@@ -276,6 +283,11 @@
       font-size: 12px;
       line-height: 1;
       padding: 0;
+    }
+
+    .rail-toggle:hover {
+      color: var(--rail-accent-2);
+      border-color: color-mix(in srgb, var(--rail-accent) 45%, var(--chrome-line-2));
     }
 
     .rail-body {
@@ -308,7 +320,7 @@
     }
 
     .rail-dot.active {
-      background: var(--openai);
+      background: var(--rail-accent-2);
       animation: railPulse 1.4s ease-in-out infinite;
     }
 
@@ -849,6 +861,15 @@
       color: var(--accent, var(--openai));
     }
 
+    /* Plug icon on MCP chips; em-sized so it scales with the chip's font
+       (10px on cards, 9px in the hub row). stroke:currentColor tints it. */
+    .file-chip.cap-chip .cap-icon {
+      width: 1.1em;
+      height: 1.1em;
+      margin-right: 0.25em;
+      vertical-align: -0.2em;
+    }
+
     .file-empty {
       color: rgba(139,148,167,.5);
       font-size: 10px;
@@ -1218,18 +1239,567 @@
         width: 320px;
       }
     }
+
+    /* --- plan rail affordances (§33) ------------------------------------ */
+    .rail-head-actions {
+      flex: 0 0 auto;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .rail-expand {
+      flex: 0 0 auto;
+      width: 22px;
+      height: 22px;
+      border: 1px solid var(--chrome-line-2);
+      border-radius: 6px;
+      background: transparent;
+      color: var(--muted);
+      cursor: pointer;
+      font-size: 12px;
+      line-height: 1;
+      padding: 0;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .rail-expand:hover {
+      color: var(--rail-accent-2);
+      border-color: color-mix(in srgb, var(--rail-accent) 45%, var(--chrome-line-2));
+    }
+
+    .rail.collapsed .rail-expand {
+      display: none;
+    }
+
+    .rail-body.clickable {
+      cursor: pointer;
+    }
+
+    /* rail header identity glyph */
+    .rail-title-wrap {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      min-width: 0;
+      overflow: hidden;
+    }
+
+    .rail-glyph {
+      flex: 0 0 auto;
+      display: grid;
+      place-items: center;
+      width: 18px;
+      height: 18px;
+      border-radius: 6px;
+      color: var(--rail-accent);
+      background: color-mix(in srgb, var(--rail-accent) 16%, transparent);
+    }
+
+    .rail-glyph svg { width: 11px; height: 11px; }
+    .rail.collapsed .rail-title-wrap { display: none; }
+
+    /* rail plan outline (§33) */
+    .rail-outline {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .rail-sec {
+      display: flex;
+      align-items: flex-start;
+      margin: 13px 0 5px;
+      padding-left: 9px;
+      border-left: 2px solid color-mix(in srgb, var(--rail-accent) 65%, transparent);
+    }
+
+    .rail-outline > .rail-sec:first-child { margin-top: 0; }
+
+    .rail-sec-text {
+      overflow: hidden;
+      color: var(--text);
+      font-size: 11.5px;
+      font-weight: 700;
+      line-height: 1.3;
+      letter-spacing: .01em;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+    }
+
+    .rail-sec.title {
+      margin: 0 0 9px;
+      padding: 0 0 10px;
+      border-left: 0;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .rail-sec.title .rail-sec-text {
+      font-size: 13px;
+      letter-spacing: 0;
+      color: var(--text);
+    }
+
+    .rail-sec.sub {
+      border-left-color: color-mix(in srgb, var(--rail-accent) 28%, var(--border));
+      margin-top: 9px;
+    }
+
+    .rail-sec.sub .rail-sec-text {
+      color: var(--muted);
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: .06em;
+      text-transform: uppercase;
+    }
+
+    .rail-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      margin: 4px 0;
+      padding-left: 11px;
+    }
+
+    .rail-item.depth1 { padding-left: 24px; }
+    .rail-item.depth2 { padding-left: 37px; }
+
+    .rail-bullet {
+      flex: 0 0 auto;
+      margin-top: 6px;
+      width: 4px;
+      height: 4px;
+      border-radius: 50%;
+      background: color-mix(in srgb, var(--rail-accent) 60%, var(--muted));
+    }
+
+    .rail-check {
+      flex: 0 0 auto;
+      margin-top: 1px;
+      width: 13px;
+      height: 13px;
+      border-radius: 4px;
+      border: 1.4px solid var(--border);
+      display: grid;
+      place-items: center;
+      font-size: 8px;
+      line-height: 1;
+      color: transparent;
+    }
+
+    .rail-check.done {
+      border-color: var(--done);
+      color: var(--done);
+      background: color-mix(in srgb, var(--done) 16%, transparent);
+    }
+
+    .rail-item-text {
+      flex: 1 1 auto;
+      min-width: 0;
+      overflow: hidden;
+      color: rgba(230,234,242,.78);
+      font-size: 11.5px;
+      line-height: 1.35;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+    }
+
+    .rail-item-text.done {
+      color: var(--muted);
+      text-decoration: line-through;
+    }
+
+    .rail-open {
+      flex: 0 0 auto;
+      margin-top: 14px;
+      width: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 7px;
+      height: 32px;
+      padding: 0 10px;
+      border: 1px solid color-mix(in srgb, var(--rail-accent) 30%, var(--border));
+      border-radius: 9px;
+      background: color-mix(in srgb, var(--rail-accent) 9%, transparent);
+      color: var(--rail-accent);
+      font-family: var(--font);
+      font-size: 11.5px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background .15s ease, border-color .15s ease;
+    }
+
+    .rail-open:hover {
+      background: color-mix(in srgb, var(--rail-accent) 18%, transparent);
+      border-color: color-mix(in srgb, var(--rail-accent) 55%, transparent);
+    }
+
+    .rail-open svg { width: 13px; height: 13px; }
+
+    /* --- plan modal (§33) ----------------------------------------------- */
+    .plan-modal {
+      position: fixed;
+      inset: 0;
+      z-index: 40;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: clamp(12px, 4vw, 40px);
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity .2s ease;
+    }
+
+    .plan-modal.open {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    .plan-backdrop {
+      position: absolute;
+      inset: 0;
+      background: rgba(6,8,12,.62);
+      backdrop-filter: blur(6px);
+    }
+
+    .plan-panel {
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      width: min(800px, 100%);
+      max-height: min(86vh, 940px);
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      box-shadow: 0 24px 64px rgba(0,0,0,.55), var(--shadow);
+      transform: translateY(10px) scale(.99);
+      transition: transform .22s cubic-bezier(.2,.8,.2,1);
+      overflow: hidden;
+    }
+
+    .plan-modal.open .plan-panel {
+      transform: none;
+    }
+
+    .plan-head {
+      flex: 0 0 auto;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 15px 16px;
+      border-bottom: 1px solid var(--border);
+      background: linear-gradient(180deg, color-mix(in srgb, var(--anthropic) 9%, transparent), transparent);
+    }
+
+    .plan-glyph {
+      flex: 0 0 auto;
+      display: grid;
+      place-items: center;
+      width: 30px;
+      height: 30px;
+      border-radius: 9px;
+      color: var(--anthropic);
+      background: color-mix(in srgb, var(--anthropic) 16%, transparent);
+    }
+
+    .plan-glyph svg {
+      width: 18px;
+      height: 18px;
+    }
+
+    .plan-heading {
+      flex: 1 1 auto;
+      min-width: 0;
+    }
+
+    .plan-title {
+      font-size: 15px;
+      font-weight: 700;
+    }
+
+    .plan-sub {
+      margin-top: 2px;
+      overflow: hidden;
+      color: var(--muted);
+      font-family: var(--mono);
+      font-size: 11px;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .plan-btn {
+      flex: 0 0 auto;
+      height: 28px;
+      padding: 0 11px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: transparent;
+      color: var(--muted);
+      cursor: pointer;
+      font-size: 11.5px;
+      font-weight: 600;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition: color .15s ease, border-color .15s ease, background .15s ease;
+    }
+
+    .plan-btn:hover {
+      color: var(--text);
+      border-color: color-mix(in srgb, var(--anthropic) 45%, var(--border));
+    }
+
+    .plan-btn.on {
+      color: var(--anthropic);
+      border-color: color-mix(in srgb, var(--anthropic) 45%, transparent);
+      background: color-mix(in srgb, var(--anthropic) 12%, transparent);
+    }
+
+    .plan-btn[hidden] {
+      display: none;
+    }
+
+    .plan-close {
+      flex: 0 0 auto;
+      width: 28px;
+      height: 28px;
+      padding: 0;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: transparent;
+      color: var(--muted);
+      cursor: pointer;
+      font-size: 12px;
+    }
+
+    .plan-close:hover {
+      color: var(--text);
+    }
+
+    .plan-body {
+      flex: 1 1 auto;
+      min-height: 0;
+      overflow-y: auto;
+      padding: 22px 28px 30px;
+    }
+
+    .plan-empty {
+      color: var(--muted);
+      font-style: italic;
+    }
+
+    /* --- rendered markdown (.md) ---------------------------------------- */
+    .md {
+      color: var(--text);
+      font-size: 14px;
+      line-height: 1.62;
+      word-wrap: break-word;
+      overflow-wrap: break-word;
+    }
+
+    .md > *:first-child { margin-top: 0; }
+    .md > *:last-child { margin-bottom: 0; }
+
+    .md h1, .md h2, .md h3, .md h4, .md h5, .md h6 {
+      margin: 1.5em 0 .6em;
+      line-height: 1.25;
+      font-weight: 700;
+    }
+
+    .md h1 {
+      font-size: 1.5em;
+      padding-bottom: .3em;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .md h2 {
+      font-size: 1.28em;
+      padding-bottom: .24em;
+      border-bottom: 1px solid color-mix(in srgb, var(--border) 65%, transparent);
+    }
+
+    .md h3 { font-size: 1.12em; }
+    .md h4 { font-size: 1em; }
+
+    .md h5, .md h6 {
+      font-size: .86em;
+      color: var(--muted);
+      letter-spacing: .04em;
+      text-transform: uppercase;
+    }
+
+    .md p { margin: .7em 0; }
+
+    .md a {
+      color: var(--anthropic);
+      text-decoration: none;
+      border-bottom: 1px solid color-mix(in srgb, var(--anthropic) 40%, transparent);
+    }
+
+    .md a:hover { border-bottom-color: var(--anthropic); }
+
+    .md strong { font-weight: 700; color: #f2f5fb; }
+    .md em { font-style: italic; }
+    .md del { opacity: .55; }
+
+    .md ul, .md ol {
+      margin: .6em 0;
+      padding-left: 1.5em;
+    }
+
+    .md li { margin: .3em 0; }
+    .md li::marker { color: var(--muted); }
+    .md ul { list-style: disc; }
+    .md ol { list-style: decimal; }
+    .md li > ul, .md li > ol { margin: .3em 0; }
+    .md .md-li-body ul, .md .md-li-body ol { margin: .3em 0; }
+
+    /* task-list items */
+    .md li.md-task {
+      list-style: none;
+      margin-left: -1.5em;
+      padding-left: 0;
+      display: flex;
+      gap: .55em;
+      align-items: flex-start;
+    }
+
+    .md .md-li-body {
+      flex: 1 1 auto;
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .md .md-check {
+      flex: 0 0 auto;
+      margin-top: .18em;
+      width: 15px;
+      height: 15px;
+      border-radius: 4px;
+      border: 1.5px solid var(--border);
+      display: grid;
+      place-items: center;
+      font-size: 10px;
+      line-height: 1;
+      color: transparent;
+    }
+
+    .md .md-check.done {
+      border-color: var(--done);
+      color: var(--done);
+      background: color-mix(in srgb, var(--done) 16%, transparent);
+    }
+
+    .md .md-check.active {
+      border-color: var(--openai);
+      color: var(--openai);
+      background: color-mix(in srgb, var(--openai) 14%, transparent);
+    }
+
+    .md .md-li-text { flex: 1 1 auto; min-width: 0; }
+
+    .md code {
+      font-family: var(--mono);
+      font-size: .88em;
+      background: rgba(255,255,255,.07);
+      border: 1px solid var(--border);
+      border-radius: 5px;
+      padding: .08em .38em;
+    }
+
+    .md pre.md-pre {
+      position: relative;
+      margin: .95em 0;
+      padding: 13px 15px;
+      background: #0c0f15;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      overflow-x: auto;
+    }
+
+    .md pre.md-pre code {
+      background: none;
+      border: 0;
+      border-radius: 0;
+      padding: 0;
+      font-size: 12.5px;
+      line-height: 1.55;
+      color: #d7dce6;
+      white-space: pre;
+    }
+
+    .md pre.md-pre[data-lang]::before {
+      content: attr(data-lang);
+      position: absolute;
+      top: 8px;
+      right: 12px;
+      font-family: var(--mono);
+      font-size: 9.5px;
+      font-weight: 700;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+      color: var(--muted);
+      pointer-events: none;
+    }
+
+    .md blockquote {
+      margin: .95em 0;
+      padding: .1em 0 .1em 14px;
+      border-left: 3px solid color-mix(in srgb, var(--anthropic) 55%, var(--border));
+      color: rgba(230,234,242,.82);
+    }
+
+    .md blockquote p { margin: .35em 0; }
+
+    .md hr {
+      margin: 1.4em 0;
+      border: 0;
+      height: 1px;
+      background: var(--border);
+    }
+
+    .md .md-table-wrap {
+      overflow-x: auto;
+      margin: 1em 0;
+    }
+
+    .md table {
+      border-collapse: collapse;
+      width: 100%;
+      font-size: 13px;
+    }
+
+    .md th, .md td {
+      padding: 7px 12px;
+      border: 1px solid var(--border);
+      text-align: left;
+    }
+
+    .md th {
+      background: rgba(255,255,255,.04);
+      font-weight: 700;
+    }
+
+    .md tbody tr:nth-child(even) td {
+      background: rgba(255,255,255,.015);
+    }
+
+    .md img {
+      max-width: 100%;
+      border-radius: 8px;
+    }
   </style>
 </head>
 <body>
   <div class="app">
     <header class="topbar">
       <div class="brand">
-        <span class="logo" aria-hidden="true">
-          <svg viewBox="0 0 16 16">
-            <path d="M8 1.8v12.4M1.8 8h12.4M3.8 3.8l8.4 8.4M12.2 3.8 3.8 12.2"></path>
-          </svg>
-        </span>
-        <span>LumenADE · Fleet view</span>
+        <svg xmlns="http://www.w3.org/2000/svg" class="brandmark" role="img" aria-label="agenticADE" viewBox="-30.00 -135.00 858.16 200.04"><title>agenticADE</title><g transform="translate(-54.824,-138.664) scale(0.96183)"><g transform="translate(-3,3)"><circle cx="78" cy="158" r="5" fill="#E11D6B"/><circle cx="68" cy="142" r="8" fill="#E11D6B"/><circle cx="92" cy="132" r="6" fill="none" stroke="#E11D6B" stroke-width="2.5"/><circle cx="86" cy="110" r="12" fill="#E11D6B"/><circle cx="112" cy="120" r="5" fill="#FF5C8A"/><circle cx="108" cy="84" r="16" fill="#E11D6B"/><circle cx="134" cy="96" r="6" fill="#FF5C8A"/><circle cx="100" cy="66" r="6" fill="none" stroke="#E11D6B" stroke-width="2.5"/><circle cx="130" cy="52" r="20" fill="#E11D6B"/></g></g><g transform="translate(129.405,0)"><path d="M226.27484130859375 -14Q173.62481689453125 -14 131.71231079101562 4.32501220703125Q89.7998046875 22.6500244140625 65.38729858398438 57.887542724609375Q40.97479248046875 93.12506103515625 40.97479248046875 143.60009765625Q40.97479248046875 194.2501220703125 65.38729858398438 228.31265258789062Q89.7998046875 262.37518310546875 132.86233520507812 279.6127014160156Q175.92486572265625 296.8502197265625 230.87493896484375 296.8502197265625H374.22442626953125V326.77508544921875Q374.22442626953125 365.97479248046875 350.12457275390625 390.3121643066406Q326.02471923828125 414.6495361328125 275.0499267578125 414.6495361328125Q225.07513427734375 414.6495361328125 199.53781127929688 391.399658203125Q174.00048828125 368.1497802734375 165.9505615234375 330.82501220703125L60.099853515625 365.97528076171875Q72.099853515625 404.8502197265625 98.51235961914062 436.87518310546875Q124.92486572265625 468.900146484375 169.16238403320312 488.57513427734375Q213.39990234375 508.2501220703125 276.699951171875 508.2501220703125Q373.6500244140625 508.2501220703125 429.5126037597656 459.42510986328125Q485.37518310546875 410.60009765625 485.37518310546875 318.82501220703125V124.900634765625Q485.37518310546875 94.900634765625 513.3751831054688 94.900634765625H554.60009765625V0H474.099853515625Q438.1497802734375 0 415.19970703125 18.087493896484375Q392.2496337890625 36.17498779296875 392.2496337890625 66.52496337890625V68.57489013671875H374.82452392578125Q369.2496337890625 54.82501220703125 354.1122131347656 35.062530517578125Q338.97479248046875 15.300048828125 308.4498291015625 0.6500244140625Q277.92486572265625 -14 226.27484130859375 -14ZM245.12506103515625 79.6005859375Q302.32476806640625 79.6005859375 338.27459716796875 112.07537841796875Q374.22442626953125 144.5501708984375 374.22442626953125 199.8497314453125V210.19970703125H238.47503662109375Q200.500244140625 210.19970703125 177.96292114257812 193.88729858398438Q155.42559814453125 177.57489013671875 155.42559814453125 147.07513427734375Q155.42559814453125 116.57537841796875 178.96292114257812 98.08798217773438Q202.500244140625 79.6005859375 245.12506103515625 79.6005859375Z" fill="#EDE9F2" transform="translate(0.000,0) scale(0.120000,-0.120000)"/><path d="M49.1497802734375 245.12506103515625V260.42510986328125Q49.1497802734375 338.2501220703125 80.23727416992188 393.6626281738281Q111.32476806640625 449.07513427734375 163.08724975585938 478.6626281738281Q214.8497314453125 508.2501220703125 276.5496826171875 508.2501220703125Q346.6495361328125 508.2501220703125 383.3119201660156 482.9377136230469Q419.97430419921875 457.62530517578125 436.8492431640625 429.17547607421875H453.79931640625V494.2501220703125H565.900146484375V-94.299560546875Q565.900146484375 -142.67474365234375 537.8250122070312 -171.33737182617188Q509.7498779296875 -200 461.67474365234375 -200H129.67474365234375V-99.79931640625H423.27435302734375Q451.79931640625 -99.79931640625 451.79931640625 -69.79931640625V73.19970703125H434.8492431640625Q424.32427978515625 55.7998046875 405.3618469238281 38.162384033203125Q386.3994140625 20.52496337890625 355.17449951171875 8.912506103515625Q323.9495849609375 -2.699951171875 276.5496826171875 -2.699951171875Q214.8497314453125 -2.699951171875 162.999755859375 26.887542724609375Q111.1497802734375 56.47503662109375 80.1497802734375 111.97503662109375Q49.1497802734375 167.47503662109375 49.1497802734375 245.12506103515625ZM308.699951171875 97.500732421875Q371.07464599609375 97.500732421875 412.2619934082031 137.12554931640625Q453.4493408203125 176.7503662109375 453.4493408203125 247.9500732421875V257.60009765625Q453.4493408203125 329.7998046875 412.67449951171875 368.92462158203125Q371.899658203125 408.0494384765625 308.699951171875 408.0494384765625Q246.500244140625 408.0494384765625 205.22540283203125 368.92462158203125Q163.9505615234375 329.7998046875 163.9505615234375 257.60009765625V247.9500732421875Q163.9505615234375 176.7503662109375 205.22540283203125 137.12554931640625Q246.500244140625 97.500732421875 308.699951171875 97.500732421875Z" fill="#EDE9F2" transform="translate(69.240,0) scale(0.120000,-0.120000)"/><path d="M298.7998046875 -14Q224.62481689453125 -14 168.2998046875 17.5Q111.97479248046875 49 80.56228637695312 106.41250610351562Q49.1497802734375 163.82501220703125 49.1497802734375 241.12506103515625V253.12506103515625Q49.1497802734375 330.60009765625 80.1497802734375 387.92510986328125Q111.1497802734375 445.2501220703125 166.88729858398438 476.7501220703125Q222.62481689453125 508.2501220703125 295.92486572265625 508.2501220703125Q368.0499267578125 508.2501220703125 421.7874450683594 476.4500732421875Q475.52496337890625 444.6500244140625 505.52496337890625 387.8499755859375Q535.5249633789062 331.0499267578125 535.5249633789062 255.39990234375V214.32476806640625H165.2506103515625Q167.42559814453125 156.32525634765625 206.31289672851562 121.26296997070312Q245.2001953125 86.20068359375 302.099853515625 86.20068359375Q357.72467041015625 86.20068359375 384.9120178222656 110.6005859375Q412.099365234375 135.00048828125 426.32427978515625 165.97528076171875L520.7498779296875 117.22491455078125Q506.57489013671875 90 480.07489013671875 59.32501220703125Q453.57489013671875 28.6500244140625 409.92486572265625 7.32501220703125Q366.27484130859375 -14 298.7998046875 -14ZM166.2506103515625 300.97528076171875H419.2491455078125Q415.2491455078125 350.27484130859375 381.8618469238281 379.1621398925781Q348.47454833984375 408.0494384765625 295.099853515625 408.0494384765625Q240.2501220703125 408.0494384765625 207.100341796875 379.1621398925781Q173.9505615234375 350.27484130859375 166.2506103515625 300.97528076171875Z" fill="#EDE9F2" transform="translate(145.920,0) scale(0.120000,-0.120000)"/><path d="M73.1497802734375 0V494.2501220703125H185.6005859375V424.87542724609375H202.5506591796875Q215.6005859375 453.1502685546875 250.00048828125 477.87518310546875Q284.400390625 502.60009765625 353.32525634765625 502.60009765625Q410.4503173828125 502.60009765625 454.0378112792969 476.8875427246094Q497.62530517578125 451.17498779296875 522.0627746582031 405.02496337890625Q546.500244140625 358.87493896484375 546.500244140625 296V0H432.0494384765625V287.0499267578125Q432.0494384765625 347.2496337890625 402.3620910644531 376.47454833984375Q372.67474365234375 405.699462890625 318.87493896484375 405.699462890625Q257.900146484375 405.699462890625 222.7503662109375 365.27459716796875Q187.6005859375 324.8497314453125 187.6005859375 250.42510986328125V0Z" fill="#EDE9F2" transform="translate(215.640,0) scale(0.120000,-0.120000)"/><path d="M260.699951171875 0Q213.4498291015625 0 184.87469482421875 28.662628173828125Q156.299560546875 57.32525634765625 156.299560546875 105.700439453125V398.99951171875H26.699951171875V494.2501220703125H156.299560546875V653.1497802734375H270.7503662109375V494.2501220703125H412.699951171875V398.99951171875H270.7503662109375V125.2506103515625Q270.7503662109375 95.2506103515625 299.100341796875 95.2506103515625H398.2501220703125V0Z" fill="#EDE9F2" transform="translate(289.440,0) scale(0.120000,-0.120000)"/><path d="M73.1497802734375 0V494.2501220703125H187.6005859375V0ZM130.37518310546875 556.7998046875Q98.47503662109375 556.7998046875 76.46243286132812 577.5748901367188Q54.4498291015625 598.3499755859375 54.4498291015625 631.900146484375Q54.4498291015625 665.6253051757812 76.46243286132812 686.3128967285156Q98.47503662109375 707.00048828125 130.37518310546875 707.00048828125Q163.27532958984375 707.00048828125 184.78793334960938 686.3128967285156Q206.300537109375 665.6253051757812 206.300537109375 631.900146484375Q206.300537109375 598.3499755859375 184.78793334960938 577.5748901367188Q163.27532958984375 556.7998046875 130.37518310546875 556.7998046875Z" fill="#EDE9F2" transform="translate(344.280,0) scale(0.120000,-0.120000)"/><path d="M304.22491455078125 -14Q232.39990234375 -14 174.42486572265625 16.087493896484375Q116.4498291015625 46.17498779296875 82.7998046875 103.17498779296875Q49.1497802734375 160.17498779296875 49.1497802734375 240.47503662109375V253.77508544921875Q49.1497802734375 334.2501220703125 82.7998046875 391.1626281738281Q116.4498291015625 448.07513427734375 174.42486572265625 478.1626281738281Q232.39990234375 508.2501220703125 304.22491455078125 508.2501220703125Q375.0499267578125 508.2501220703125 425.6124572753906 482.9876403808594Q476.17498779296875 457.72515869140625 506.97503662109375 414.400146484375Q537.7750854492188 371.07513427734375 547.2501220703125 317.47503662109375L436.27435302734375 293.92486572265625Q432.099365234375 325.499755859375 417.0494384765625 350.9871520996094Q401.99951171875 376.47454833984375 374.6621398925781 391.4369812011719Q347.32476806640625 406.3994140625 306.699951171875 406.3994140625Q266.07513427734375 406.3994140625 233.56277465820312 388.49951171875Q201.0504150390625 370.599609375 182.32550048828125 335.999755859375Q163.6005859375 301.39990234375 163.6005859375 251.9500732421875V242.300048828125Q163.6005859375 192.8502197265625 182.32550048828125 158.2503662109375Q201.0504150390625 123.6505126953125 233.56277465820312 105.7506103515625Q266.07513427734375 87.8507080078125 306.699951171875 87.8507080078125Q367.72467041015625 87.8507080078125 399.4120178222656 119.4505615234375Q431.099365234375 151.0504150390625 439.4493408203125 201.1502685546875L550.4251098632812 175.12506103515625Q538.1250610351562 123.17498779296875 507.1500244140625 79.8499755859375Q476.17498779296875 36.52496337890625 425.6124572753906 11.262481689453125Q375.0499267578125 -14 304.22491455078125 -14Z" fill="#EDE9F2" transform="translate(375.600,0) scale(0.120000,-0.120000)"/><path d="M19.7498779296875 0 211.62432861328125 700H421.32574462890625L613.2001953125 0H489.27435302734375L447.42462158203125 159.599609375H185.52545166015625L143.67572021484375 0ZM214.2506103515625 270.400390625H418.699462890625L324.9500732421875 624.8744506835938H308Z" fill="#E11D6B" transform="translate(446.280,0) scale(0.120000,-0.120000)"/><path d="M46.3499755859375 0V105.8507080078125H139.7498779296875V594.1492919921875H46.3499755859375V700H330.500244140625Q470.80029296875 700 544.8252563476562 628.8499755859375Q618.8502197265625 557.699951171875 618.8502197265625 415.6500244140625V284.17498779296875Q618.8502197265625 142.12506103515625 544.8252563476562 71.06253051757812Q470.80029296875 0 330.500244140625 0ZM259.8507080078125 109.1507568359375H332.1502685546875Q417.39990234375 109.1507568359375 458.07464599609375 153.07562255859375Q498.7493896484375 197.00048828125 498.7493896484375 280.3499755859375V419.47503662109375Q498.7493896484375 503.82452392578125 458.07464599609375 547.2493896484375Q417.39990234375 590.6742553710938 332.1502685546875 590.6742553710938H259.8507080078125Z" fill="#E11D6B" transform="translate(522.240,0) scale(0.120000,-0.120000)"/><path d="M69.499755859375 0V700H514.7750854492188V590.8492431640625H189.6005859375V407.22540283203125H486.77508544921875V298.07464599609375H189.6005859375V109.1507568359375H520.4251098632812V0Z" fill="#E11D6B" transform="translate(602.040,0) scale(0.120000,-0.120000)"/><circle cx="359.93" cy="-75.83" r="10.75" fill="#FF5C8A"/></g></svg>
       </div>
       <div class="controls">
         <div class="chip" id="runningCount">0 running</div>
@@ -1237,6 +1807,13 @@
         <select id="sessionPicker" aria-label="Session">
           <option value="__latest">Follow latest</option>
         </select>
+        <button class="bell" id="planOpen" type="button" hidden aria-label="Open plan" title="Open plan">
+          <svg viewBox="0 0 16 16" aria-hidden="true">
+            <path d="M4.2 2.6h5l3.1 3.1v7.5a.8.8 0 0 1-.8.8H4.2a.8.8 0 0 1-.8-.8V3.4a.8.8 0 0 1 .8-.8Z"></path>
+            <path d="M9 2.7v3.1h3.1"></path>
+            <path d="M5.9 8.6h4.2M5.9 10.9h4.2"></path>
+          </svg>
+        </button>
         <button class="bell" id="resetLayout" type="button" hidden aria-label="Reset card layout" title="Reset card layout">
           <svg viewBox="0 0 16 16" aria-hidden="true">
             <path d="M13.2 8a5.2 5.2 0 1 1-1.6-3.75"></path>
@@ -1259,10 +1836,21 @@
     <div class="layout" id="layout">
       <aside class="rail" id="rail" aria-label="Plan">
         <div class="rail-head">
-          <span class="rail-title">Plan</span>
-          <button class="rail-toggle" id="railToggle" type="button" aria-label="Collapse plan rail">‹</button>
+          <span class="rail-title-wrap">
+            <span class="rail-glyph" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                <circle cx="12" cy="12" r="8.5"></circle>
+                <circle cx="12" cy="12" r="2.2" fill="currentColor" stroke="none"></circle>
+              </svg>
+            </span>
+            <span class="rail-title">Plan</span>
+          </span>
+          <div class="rail-head-actions">
+            <button class="rail-expand" id="railExpand" type="button" aria-label="Open full plan" title="Open full plan">⤢</button>
+            <button class="rail-toggle" id="railToggle" type="button" aria-label="Collapse plan rail">‹</button>
+          </div>
         </div>
-        <div class="rail-body" id="railBody"></div>
+        <div class="rail-body" id="railBody" title="Open full plan"></div>
       </aside>
 
       <main class="canvas" id="canvas">
@@ -1322,6 +1910,28 @@
         </div>
       </aside>
     </div>
+
+    <div class="plan-modal" id="planModal" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="planTitle">
+      <div class="plan-backdrop" id="planBackdrop"></div>
+      <div class="plan-panel" role="document">
+        <div class="plan-head">
+          <span class="plan-glyph" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6">
+              <circle cx="12" cy="12" r="8.5"></circle>
+              <circle cx="12" cy="12" r="2.2" fill="currentColor" stroke="none"></circle>
+            </svg>
+          </span>
+          <div class="plan-heading">
+            <div class="plan-title" id="planTitle">Plan</div>
+            <div class="plan-sub" id="planSub"></div>
+          </div>
+          <button class="plan-btn" id="planAutoToggle" type="button" aria-pressed="true" title="Auto-open new plans as they're created">Auto-open</button>
+          <button class="plan-btn" id="planCopy" type="button" title="Copy plan markdown">Copy</button>
+          <button class="plan-close" id="planClose" type="button" aria-label="Close plan">✕</button>
+        </div>
+        <div class="plan-body md" id="planBody"></div>
+      </div>
+    </div>
   </div>
 
   <script>
@@ -1341,14 +1951,19 @@
       const NARRATIVE_FRESH_MS = 90000;
       const LINEAGE_INDENT = 24;
       const LINEAGE_DEPTH_CAP = 2;
-      const CAP_GLYPH = { skill: "✦", mcp: "⌁" };
+      const CAP_GLYPH = { skill: "✦" };
+      // MCP capability chips render this plug icon instead of a text glyph;
+      // stroke:currentColor makes it inherit the chip's provider tint (§26).
+      const MCP_ICON =
+        '<svg xmlns="http://www.w3.org/2000/svg" class="cap-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3.49994 11.7501L11.6717 3.57855C12.7762 2.47398 14.5672 2.47398 15.6717 3.57855C16.7762 4.68312 16.7762 6.47398 15.6717 7.57855M15.6717 7.57855L9.49994 13.7501M15.6717 7.57855C16.7762 6.47398 18.5672 6.47398 19.6717 7.57855C20.7762 8.68312 20.7762 10.474 19.6717 11.5785L12.7072 18.543C12.3167 18.9335 12.3167 19.5667 12.7072 19.9572L13.9999 21.2499"></path><path d="M17.4999 9.74921L11.3282 15.921C10.2237 17.0255 8.43272 17.0255 7.32822 15.921C6.22373 14.8164 6.22373 13.0255 7.32822 11.921L13.4999 5.74939"></path></svg>';
       const EMPTY_IDLE_TEXT = "Fleet idle — run  npm run demo  to see it move.";
       const EMPTY_WORKING_TEXT = "Fleet idle — the orchestrator is working, no agents spawned yet.";
-      // Brand marks (white variants, via Brandfetch) inlined as data URIs so the
-      // page keeps its no-external-requests guarantee.
+      // Brand marks via Brandfetch, inlined as data URIs so the page keeps its
+      // no-external-requests guarantee: Claude sunburst in brand orange (#D97757),
+      // OpenAI blossom in white.
       const LOGOS = {
-        anthropic: "data:image/svg+xml;base64,PHN2ZyB2ZXJzaW9uPSIxLjEiIGlkPSJMYXllcl8xIiB4bWxuczp4PSJuc19leHRlbmQ7IiB4bWxuczppPSJuc19haTsiIHhtbG5zOmdyYXBoPSJuc19ncmFwaHM7IiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHhtbG5zOnhsaW5rPSJodHRwOi8vd3d3LnczLm9yZy8xOTk5L3hsaW5rIiB4PSIwcHgiIHk9IjBweCIgdmlld0JveD0iMCAwIDkyLjIgNjUiIHN0eWxlPSJlbmFibGUtYmFja2dyb3VuZDpuZXcgMCAwIDkyLjIgNjU7IiB4bWw6c3BhY2U9InByZXNlcnZlIj4KIDxzdHlsZSB0eXBlPSJ0ZXh0L2NzcyI+CiAgLnN0MHtmaWxsOiNGRkZGRkY7fQogPC9zdHlsZT4KIDxtZXRhZGF0YT4KICA8c2Z3IHhtbG5zPSJuc19zZnc7Ij4KICAgPHNsaWNlcz4KICAgPC9zbGljZXM+CiAgIDxzbGljZVNvdXJjZUJvdW5kcyBib3R0b21MZWZ0T3JpZ2luPSJ0cnVlIiBoZWlnaHQ9IjY1IiB3aWR0aD0iOTIuMiIgeD0iLTQzLjciIHk9Ii05OCI+CiAgIDwvc2xpY2VTb3VyY2VCb3VuZHM+CiAgPC9zZnc+CiA8L21ldGFkYXRhPgogPHBhdGggY2xhc3M9InN0MCIgZD0iTTY2LjUsMEg1Mi40bDI1LjcsNjVoMTQuMUw2Ni41LDB6IE0yNS43LDBMMCw2NWgxNC40bDUuMy0xMy42aDI2LjlMNTEuOCw2NWgxNC40TDQwLjUsMEM0MC41LDAsMjUuNywwLDI1LjcsMHoKCSBNMjQuMywzOS4zbDguOC0yMi44bDguOCwyMi44SDI0LjN6Ij4KIDwvcGF0aD4KPC9zdmc+",
-        openai: "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNzIxIiBoZWlnaHQ9IjcyMSIgdmlld0JveD0iMCAwIDcyMSA3MjEiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxnIGNsaXAtcGF0aD0idXJsKCNjbGlwMF8xNjM3XzI5MzUpIj4KPGcgY2xpcC1wYXRoPSJ1cmwoI2NsaXAxXzE2MzdfMjkzNSkiPgo8cGF0aCBkPSJNMzA0LjI0NiAyOTUuNDExVjI0OS44MjhDMzA0LjI0NiAyNDUuOTg5IDMwNS42ODcgMjQzLjEwOSAzMDkuMDQ0IDI0MS4xOTFMNDAwLjY5MiAxODguNDEyQzQxMy4xNjcgMTgxLjIxNSA0MjguMDQyIDE3Ny44NTggNDQzLjM5NCAxNzcuODU4QzUwMC45NzEgMTc3Ljg1OCA1MzcuNDQgMjIyLjQ4MiA1MzcuNDQgMjY5Ljk4MkM1MzcuNDQgMjczLjM0IDUzNy40NCAyNzcuMTc5IDUzNi45NTkgMjgxLjAxOEw0NDEuOTU0IDIyNS4zNThDNDM2LjE5NyAyMjIgNDMwLjQzNyAyMjIgNDI0LjY4IDIyNS4zNThMMzA0LjI0NiAyOTUuNDExWk01MTguMjQ1IDQ3Mi45NDVWMzY0LjAyNEM1MTguMjQ1IDM1Ny4zMDQgNTE1LjM2NCAzNTIuNTA3IDUwOS42MDggMzQ5LjE0OUwzODkuMTc0IDI3OS4wOTZMNDI4LjUxOSAyNTYuNTQzQzQzMS44NzcgMjU0LjYyNiA0MzQuNzU3IDI1NC42MjYgNDM4LjExNSAyNTYuNTQzTDUyOS43NjIgMzA5LjMyM0M1NTYuMTU0IDMyNC42NzkgNTczLjkwNSAzNTcuMzA0IDU3My45MDUgMzg4Ljk3MUM1NzMuOTA1IDQyNS40MzYgNTUyLjMxNSA0NTkuMDI0IDUxOC4yNDUgNDcyLjk0MVY0NzIuOTQ1Wk0yNzUuOTM3IDM3Ni45ODJMMjM2LjU5MiAzNTMuOTUyQzIzMy4yMzUgMzUyLjAzNCAyMzEuNzk0IDM0OS4xNTQgMjMxLjc5NCAzNDUuMzE1VjIzOS43NTZDMjMxLjc5NCAxODguNDE2IDI3MS4xMzkgMTQ5LjU0OCAzMjQuNCAxNDkuNTQ4QzM0NC41NTUgMTQ5LjU0OCAzNjMuMjY0IDE1Ni4yNjggMzc5LjEwMiAxNjguMjYyTDI4NC41NzggMjIyLjk2NEMyNzguODIyIDIyNi4zMjEgMjc1Ljk0MiAyMzEuMTE5IDI3NS45NDIgMjM3LjgzOFYzNzYuOTg2TDI3NS45MzcgMzc2Ljk4MlpNMzYwLjYyNiA0MjUuOTIyTDMwNC4yNDYgMzk0LjI1NVYzMjcuMDgzTDM2MC42MjYgMjk1LjQxNkw0MTcuMDAyIDMyNy4wODNWMzk0LjI1NUwzNjAuNjI2IDQyNS45MjJaTTM5Ni44NTIgNTcxLjc4OUMzNzYuNjk4IDU3MS43ODkgMzU3Ljk4OSA1NjUuMDcgMzQyLjE1MSA1NTMuMDc1TDQzNi42NzQgNDk4LjM3NEM0NDIuNDMxIDQ5NS4wMTcgNDQ1LjMxMSA0OTAuMjE5IDQ0NS4zMTEgNDgzLjQ5OVYzNDQuMzUyTDQ4NS4xMzggMzY3LjM4MkM0ODguNDk1IDM2OS4yOTkgNDg5LjkzNiAzNzIuMTc5IDQ4OS45MzYgMzc2LjAxOFY0ODEuNTc3QzQ4OS45MzYgNTMyLjkxNyA0NTAuMTA5IDU3MS43ODUgMzk2Ljg1MiA1NzEuNzg1VjU3MS43ODlaTTI4My4xMzQgNDY0Ljc5TDE5MS40ODYgNDEyLjAxQzE2NS4wOTQgMzk2LjY1NCAxNDcuMzQzIDM2NC4wMjkgMTQ3LjM0MyAzMzIuMzYyQzE0Ny4zNDMgMjk1LjQxNiAxNjkuNDE1IDI2Mi4zMDkgMjAzLjQ4IDI0OC4zOTNWMzU3Ljc5MUMyMDMuNDggMzY0LjUxIDIwNi4zNjEgMzY5LjMwOCAyMTIuMTE3IDM3Mi42NjVMMzMyLjA3NCA0NDIuMjM3TDI5Mi43MjkgNDY0Ljc5QzI4OS4zNzIgNDY2LjcwNyAyODYuNDkxIDQ2Ni43MDcgMjgzLjEzNCA0NjQuNzlaTTI3Ny44NTkgNTQzLjQ4QzIyMy42MzkgNTQzLjQ4IDE4My44MTMgNTAyLjY5NSAxODMuODEzIDQ1Mi4zMTRDMTgzLjgxMyA0NDguNDc1IDE4NC4yOTQgNDQ0LjYzNiAxODQuNzcxIDQ0MC43OTdMMjc5LjI5NSA0OTUuNDk4QzI4NS4wNTEgNDk4Ljg1NiAyOTAuODEyIDQ5OC44NTYgMjk2LjU2OCA0OTUuNDk4TDQxNy4wMDIgNDI1LjkyN1Y0NzEuNTA5QzQxNy4wMDIgNDc1LjM0OSA0MTUuNTYyIDQ3OC4yMjkgNDEyLjIwNCA0ODAuMTQ2TDMyMC41NTcgNTMyLjkyNkMzMDguMDgxIDU0MC4xMjIgMjkzLjIwNiA1NDMuNDggMjc3Ljg1NCA1NDMuNDhIMjc3Ljg1OVpNMzk2Ljg1MiA2MDAuNTc2QzQ1NC45MTEgNjAwLjU3NiA1MDMuMzcgNTU5LjMxMyA1MTQuNDEgNTA0LjYxMkM1NjguMTQ5IDQ5MC42OTYgNjAyLjY5NiA0NDAuMzE1IDYwMi42OTYgMzg4Ljk3NkM2MDIuNjk2IDM1NS4zODcgNTg4LjMwMyAzMjIuNzYyIDU2Mi4zOTIgMjk5LjI1QzU2NC43OTEgMjg5LjE3MyA1NjYuMjMxIDI3OS4wOTYgNTY2LjIzMSAyNjkuMDI0QzU2Ni4yMzEgMjAwLjQxMSA1MTAuNTcxIDE0OS4wNjcgNDQ2LjI3NCAxNDkuMDY3QzQzMy4zMjIgMTQ5LjA2NyA0MjAuODQ2IDE1MC45ODQgNDA4LjM3IDE1NS4zMDVDMzg2Ljc3NSAxMzQuMTkyIDM1Ny4wMjYgMTIwLjc1OCAzMjQuNCAxMjAuNzU4QzI2Ni4zNDIgMTIwLjc1OCAyMTcuODgzIDE2Mi4wMiAyMDYuODQzIDIxNi43MjFDMTUzLjEwNCAyMzAuNjM3IDExOC41NTcgMjgxLjAxOCAxMTguNTU3IDMzMi4zNTdDMTE4LjU1NyAzNjUuOTQ2IDEzMi45NSAzOTguNTcxIDE1OC44NjEgNDIyLjA4M0MxNTYuNDYyIDQzMi4xNiAxNTUuMDIyIDQ0Mi4yMzcgMTU1LjAyMiA0NTIuMzA5QzE1NS4wMjIgNTIwLjkyMiAyMTAuNjgyIDU3Mi4yNjYgMjc0Ljk3OCA1NzIuMjY2QzI4Ny45MzEgNTcyLjI2NiAzMDAuNDA3IDU3MC4zNDkgMzEyLjg4MyA1NjYuMDI4QzMzNC40NzMgNTg3LjE0MSAzNjQuMjIyIDYwMC41NzYgMzk2Ljg1MiA2MDAuNTc2WiIgZmlsbD0id2hpdGUiLz4KPC9nPgo8L2c+CjxkZWZzPgo8Y2xpcFBhdGggaWQ9ImNsaXAwXzE2MzdfMjkzNSI+CjxyZWN0IHdpZHRoPSI3MjAiIGhlaWdodD0iNzIwIiBmaWxsPSJ3aGl0ZSIgdHJhbnNmb3JtPSJ0cmFuc2xhdGUoMC42MDY5MzQgMC44OTk5MDIpIi8+CjwvY2xpcFBhdGg+CjxjbGlwUGF0aCBpZD0iY2xpcDFfMTYzN18yOTM1Ij4KPHJlY3Qgd2lkdGg9IjQ4NC4xMzkiIGhlaWdodD0iNDc5LjgxOCIgZmlsbD0id2hpdGUiIHRyYW5zZm9ybT0idHJhbnNsYXRlKDExOC41NTcgMTIwLjc1OCkiLz4KPC9jbGlwUGF0aD4KPC9kZWZzPgo8L3N2Zz4K"
+        anthropic: "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMDAgMTAwIiBmaWxsPSIjRDk3NzU3Ij48cGF0aCBkPSJtMTkuNiA2Ni41IDE5LjctMTEgLjMtMS0uMy0uNWgtMWwtMy4zLS4yLTExLjItLjNMMTQgNTNsLTkuNS0uNS0yLjQtLjVMMCA0OWwuMi0xLjUgMi0xLjMgMi45LjIgNi4zLjUgOS41LjYgNi45LjRMMzggNDkuMWgxLjZsLjItLjctLjUtLjQtLjQtLjRMMjkgNDFsLTEwLjYtNy01LjYtNC4xLTMtMi0xLjUtMi0uNi00LjIgMi43LTMgMy43LjMuOS4yIDMuNyAyLjkgOCA2LjFMMzcgMzZsMS41IDEuMi42LS40LjEtLjMtLjctMS4xTDMzIDI1bC02LTEwLjQtMi43LTQuMy0uNy0yLjZjLS4zLTEtLjQtMi0uNC0zbDMtNC4yTDI4IDBsNC4yLjZMMzMuOCAybDIuNiA2IDQuMSA5LjNMNDcgMjkuOWwyIDMuOCAxIDMuNC4zIDFoLjd2LS41bC41LTcuMiAxLTguNyAxLTExLjIuMy0zLjIgMS42LTMuOCAzLTJMNjEgMi42bDIgMi45LS4zIDEuOC0xLjEgNy43TDU5IDI3LjFsLTEuNSA4LjJoLjlsMS0xLjEgNC4xLTUuNCA2LjktOC42IDMtMy41TDc3IDEzbDIuMy0xLjhoNC4zbDMuMSA0LjctMS40IDQuOS00LjQgNS42LTMuNyA0LjctNS4zIDcuMS0zLjIgNS43LjMuNGguN2wxMi0yLjYgNi40LTEuMSA3LjYtMS4zIDMuNSAxLjYuNCAxLjYtMS40IDMuNC04LjIgMi05LjYgMi0xNC4zIDMuMy0uMi4xLjIuMyA2LjQuNiAyLjguMmg2LjhsMTIuNiAxIDMuMyAyIDEuOSAyLjctLjMgMi01LjEgMi42LTYuOC0xLjYtMTYtMy44LTUuNC0xLjNoLS44di40bDQuNiA0LjUgOC4zIDcuNUw4OSA4MC4xbC41IDIuNC0xLjMgMi0xLjQtLjItOS4yLTctMy42LTMtOC02LjhoLS41di43bDEuOCAyLjcgOS44IDE0LjcuNSA0LjUtLjcgMS40LTIuNiAxLTIuNy0uNi01LjgtOC02LTktNC43LTguMi0uNS40LTIuOSAzMC4yLTEuMyAxLjUtMyAxLjItMi41LTItMS40LTMgMS40LTYuMiAxLjYtOCAxLjMtNi40IDEuMi03LjkuNy0yLjZ2LS4ySDQ5TDQzIDcybC05IDEyLjMtNy4yIDcuNi0xLjcuNy0zLTEuNS4zLTIuOEwyNCA4NmwxMC0xMi44IDYtNy45IDQtNC42LS4xLS41aC0uM0wxNy4yIDc3LjRsLTQuNy42LTItMiAuMi0zIDEtMSA4LTUuNVoiPjwvcGF0aD48L3N2Zz4=",
+        openai: "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNzIxIiBoZWlnaHQ9IjcyMSIgdmlld0JveD0iMCAwIDcyMSA3MjEiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxnIGNsaXAtcGF0aD0idXJsKCNjbGlwMF8xNjM3XzI5MzUpIj4KPGcgY2xpcC1wYXRoPSJ1cmwoI2NsaXAxXzE2MzdfMjkzNSkiPgo8cGF0aCBkPSJNMzA0LjI0NiAyOTUuNDExVjI0OS44MjhDMzA0LjI0NiAyNDUuOTg5IDMwNS42ODcgMjQzLjEwOSAzMDkuMDQ0IDI0MS4xOTFMNDAwLjY5MiAxODguNDEyQzQxMy4xNjcgMTgxLjIxNSA0MjguMDQyIDE3Ny44NTggNDQzLjM5NCAxNzcuODU4QzUwMC45NzEgMTc3Ljg1OCA1MzcuNDQgMjIyLjQ4MiA1MzcuNDQgMjY5Ljk4MkM1MzcuNDQgMjczLjM0IDUzNy40NCAyNzcuMTc5IDUzNi45NTkgMjgxLjAxOEw0NDEuOTU0IDIyNS4zNThDNDM2LjE5NyAyMjIgNDMwLjQzNyAyMjIgNDI0LjY4IDIyNS4zNThMMzA0LjI0NiAyOTUuNDExWk01MTguMjQ1IDQ3Mi45NDVWMzY0LjAyNEM1MTguMjQ1IDM1Ny4zMDQgNTE1LjM2NCAzNTIuNTA3IDUwOS42MDggMzQ5LjE0OUwzODkuMTc0IDI3OS4wOTZMNDI4LjUxOSAyNTYuNTQzQzQzMS44NzcgMjU0LjYyNiA0MzQuNzU3IDI1NC42MjYgNDM4LjExNSAyNTYuNTQzTDUyOS43NjIgMzA5LjMyM0M1NTYuMTU0IDMyNC42NzkgNTczLjkwNSAzNTcuMzA0IDU3My45MDUgMzg4Ljk3MUM1NzMuOTA1IDQyNS40MzYgNTUyLjMxNSA0NTkuMDI0IDUxOC4yNDUgNDcyLjk0MVY0NzIuOTQ1Wk0yNzUuOTM3IDM3Ni45ODJMMjM2LjU5MiAzNTMuOTUyQzIzMy4yMzUgMzUyLjAzNCAyMzEuNzk0IDM0OS4xNTQgMjMxLjc5NCAzNDUuMzE1VjIzOS43NTZDMjMxLjc5NCAxODguNDE2IDI3MS4xMzkgMTQ5LjU0OCAzMjQuNCAxNDkuNTQ4QzM0NC41NTUgMTQ5LjU0OCAzNjMuMjY0IDE1Ni4yNjggMzc5LjEwMiAxNjguMjYyTDI4NC41NzggMjIyLjk2NEMyNzguODIyIDIyNi4zMjEgMjc1Ljk0MiAyMzEuMTE5IDI3NS45NDIgMjM3LjgzOFYzNzYuOTg2TDI3NS45MzcgMzc2Ljk4MlpNMzYwLjYyNiA0MjUuOTIyTDMwNC4yNDYgMzk0LjI1NVYzMjcuMDgzTDM2MC42MjYgMjk1LjQxNkw0MTcuMDAyIDMyNy4wODNWMzk0LjI1NUwzNjAuNjI2IDQyNS45MjJaTTM5Ni44NTIgNTcxLjc4OUMzNzYuNjk4IDU3MS43ODkgMzU3Ljk4OSA1NjUuMDcgMzQyLjE1MSA1NTMuMDc1TDQzNi42NzQgNDk4LjM3NEM0NDIuNDMxIDQ5NS4wMTcgNDQ1LjMxMSA0OTAuMjE5IDQ0NS4zMTEgNDgzLjQ5OVYzNDQuMzUyTDQ4NS4xMzggMzY3LjM4MkM0ODguNDk1IDM2OS4yOTkgNDg5LjkzNiAzNzIuMTc5IDQ4OS45MzYgMzc2LjAxOFY0ODEuNTc3QzQ4OS45MzYgNTMyLjkxNyA0NTAuMTA5IDU3MS43ODUgMzk2Ljg1MiA1NzEuNzg1VjU3MS43ODlaTTI4My4xMzQgNDY0Ljc5TDE5MS40ODYgNDEyLjAxQzE2NS4wOTQgMzk2LjY1NCAxNDcuMzQzIDM2NC4wMjkgMTQ3LjM0MyAzMzIuMzYyQzE0Ny4zNDMgMjk1LjQxNiAxNjkuNDE1IDI2Mi4zMDkgMjAzLjQ4IDI0OC4zOTNWMzU3Ljc5MUMyMDMuNDggMzY0LjUxIDIwNi4zNjEgMzY5LjMwOCAyMTIuMTE3IDM3Mi42NjVMMzMyLjA3NCA0NDIuMjM3TDI5Mi43MjkgNDY0Ljc5QzI4OS4zNzIgNDY2LjcwNyAyODYuNDkxIDQ2Ni43MDcgMjgzLjEzNCA0NjQuNzlaTTI3Ny44NTkgNTQzLjQ4QzIyMy42MzkgNTQzLjQ4IDE4My44MTMgNTAyLjY5NSAxODMuODEzIDQ1Mi4zMTRDMTgzLjgxMyA0NDguNDc1IDE4NC4yOTQgNDQ0LjYzNiAxODQuNzcxIDQ0MC43OTdMMjc5LjI5NSA0OTUuNDk4QzI4NS4wNTEgNDk4Ljg1NiAyOTAuODEyIDQ5OC44NTYgMjk2LjU2OCA0OTUuNDk4TDQxNy4wMDIgNDI1LjkyN1Y0NzEuNTA5QzQxNy4wMDIgNDc1LjM0OSA0MTUuNTYyIDQ3OC4yMjkgNDEyLjIwNCA0ODAuMTQ2TDMyMC41NTcgNTMyLjkyNkMzMDguMDgxIDU0MC4xMjIgMjkzLjIwNiA1NDMuNDggMjc3Ljg1NCA1NDMuNDhIMjc3Ljg1OVpNMzk2Ljg1MiA2MDAuNTc2QzQ1NC45MTEgNjAwLjU3NiA1MDMuMzcgNTU5LjMxMyA1MTQuNDEgNTA0LjYxMkM1NjguMTQ5IDQ5MC42OTYgNjAyLjY5NiA0NDAuMzE1IDYwMi42OTYgMzg4Ljk3NkM2MDIuNjk2IDM1NS4zODcgNTg4LjMwMyAzMjIuNzYyIDU2Mi4zOTIgMjk5LjI1QzU2NC43OTEgMjg5LjE3MyA1NjYuMjMxIDI3OS4wOTYgNTY2LjIzMSAyNjkuMDI0QzU2Ni4yMzEgMjAwLjQxMSA1MTAuNTcxIDE0OS4wNjcgNDQ2LjI3NCAxNDkuMDY3QzQzMy4zMjIgMTQ5LjA2NyA0MjAuODQ2IDE1MC45ODQgNDA4LjM3IDE1NS4zMDVDMzg2Ljc3NSAxMzQuMTkyIDM1Ny4wMjYgMTIwLjc1OCAzMjQuNCAxMjAuNzU4QzI2Ni4zNDIgMTIwLjc1OCAyMTcuODgzIDE2Mi4wMiAyMDYuODQzIDIxNi43MjFDMTUzLjEwNCAyMzAuNjM3IDExOC41NTcgMjgxLjAxOCAxMTguNTU3IDMzMi4zNTdDMTE4LjU1NyAzNjUuOTQ2IDEzMi45NSAzOTguNTcxIDE1OC44NjEgNDIyLjA4M0MxNTYuNDYyIDQzMi4xNiAxNTUuMDIyIDQ0Mi4yMzcgMTU1LjAyMiA0NTIuMzA5QzE1NS4wMjIgNTIwLjkyMiAyMTAuNjgyIDU3Mi4yNjYgMjc0Ljk3OCA1NzIuMjY2QzI4Ny45MzEgNTcyLjI2NiAzMDAuNDA3IDU3MC4zNDkgMzEyLjg4MyA1NjYuMDI4QzMzNC40NzMgNTg3LjE0MSAzNjQuMjIyIDYwMC41NzYgMzk2Ljg1MiA2MDAuNTc2WiIgZmlsbD0id2hpdGUiLz4KPC9nPgo8L2c+CjxkZWZzPgo8Y2xpcFBhdGggaWQ9ImNsaXAwXzE2MzdfMjkzNSI+CjxyZWN0IHdpZHRoPSI3MjAiIGhlaWdodD0iNzIwIiBmaWxsPSJ3aGl0ZSIgdHJhbnNmb3JtPSJ0cmFuc2xhdGUoMC42MDY5MzQgMC44OTk5MDIpIi8+CjwvY2xpcFBhdGg+CjxjbGlwUGF0aCBpZD0iY2xpcDFfMTYzN18yOTM1Ij4KPHJlY3Qgd2lkdGg9IjQ4NC4xMzkiIGhlaWdodD0iNDc5LjgxOCIgZmlsbD0id2hpdGUiIHRyYW5zZm9ybT0idHJhbnNsYXRlKDExOC41NTcgMTIwLjc1OCkiLz4KPC9jbGlwUGF0aD4KPC9kZWZzPgo8L3N2Zz4="
       };
       const state = {
         sessions: new Map(),
@@ -1366,7 +1981,16 @@
         // the auto slot at paint time only — the card keeps its slot in the
         // stack, so dragging one card never shifts another.
         manual: new Map(),
-        manualSessionId: null
+        manualSessionId: null,
+        // §33: plan-doc viewer. seenPlanDocs tracks the last plan.doc string
+        // observed per session so auto-open fires once per genuinely-new plan
+        // (a plan.step update re-broadcasts the same doc — that must not
+        // re-pop the modal). planModalSessionId/planModalDoc pin the modal to
+        // one session and its currently-rendered markdown so renderAll never
+        // re-parses an unchanged doc.
+        seenPlanDocs: new Map(),
+        planModalSessionId: null,
+        planModalDoc: null
       };
       const els = {
         layout: document.getElementById("layout"),
@@ -1409,7 +2033,17 @@
         drawerTokensCost: document.getElementById("drawerTokensCost"),
         drawerFinal: document.getElementById("drawerFinal"),
         drawerLog: document.getElementById("drawerLog"),
-        drawerClose: document.getElementById("drawerClose")
+        drawerClose: document.getElementById("drawerClose"),
+        planOpen: document.getElementById("planOpen"),
+        railExpand: document.getElementById("railExpand"),
+        planModal: document.getElementById("planModal"),
+        planBackdrop: document.getElementById("planBackdrop"),
+        planTitle: document.getElementById("planTitle"),
+        planSub: document.getElementById("planSub"),
+        planBody: document.getElementById("planBody"),
+        planAutoToggle: document.getElementById("planAutoToggle"),
+        planCopy: document.getElementById("planCopy"),
+        planClose: document.getElementById("planClose")
       };
       const nodes = new Map();
       const paths = new Map();
@@ -1594,17 +2228,426 @@
         return session ? state.plans.get(session.id) || null : null;
       }
 
+      // Flatten inline markdown to plain text for the compact rail peek
+      // (the full-fidelity render lives in the plan modal, §33).
+      function stripInlineMd(text) {
+        return String(text)
+          .replace(/`([^`]+)`/g, "$1")
+          .replace(/\*\*([^*]+)\*\*/g, "$1")
+          .replace(/__([^_]+)__/g, "$1")
+          .replace(/\*([^*]+)\*/g, "$1")
+          .replace(/~~([^~]+)~~/g, "$1")
+          .replace(/\[([^\]]+)\]\([^)]*\)/g, "$1");
+      }
+
+      // Rail peek: headings + list items, markers/checkboxes/inline markup
+      // stripped. Broader than the old list-only filter so a plan that leads
+      // with prose headings still shows something in the rail.
       function extractDocLines(markdown) {
         return String(markdown || "")
           .split("\n")
           .map(line => line.trim())
-          .filter(line => /^(-|\*|\d+\.)\s+/.test(line))
-          .map(line => line.replace(/^(-|\*|\d+\.)\s+/, ""));
+          .filter(line => /^(#{1,6}\s+|(-|\*|\+|\d+\.)\s+)/.test(line))
+          .map(line => line
+            .replace(/^#{1,6}\s+/, "")
+            .replace(/^(-|\*|\+|\d+\.)\s+/, "")
+            .replace(/^\[[ xX]\]\s+/, ""))
+          .map(stripInlineMd)
+          .filter(Boolean);
       }
 
       function stepIndex(plan, stepId) {
         if (!plan || !stepId) return -1;
         return (plan.steps || []).findIndex(step => step.id === stepId);
+      }
+
+      // --- markdown rendering (§33) -----------------------------------------
+      // A compact, dependency-free, XSS-safe Markdown -> DOM renderer. Every
+      // scrap of text reaches the page via textContent (never innerHTML), and
+      // link hrefs are scheme-checked, so a plan doc can contain arbitrary
+      // markup without becoming an injection vector. Supports: ATX headings,
+      // fenced code (with language tag), blockquotes, ordered/unordered lists
+      // with nesting + task-list checkboxes, GFM pipe tables, thematic breaks,
+      // and inline code/bold/italic/strike/links.
+
+      function mdEl(tag, className) {
+        const node = document.createElement(tag);
+        if (className) node.className = className;
+        return node;
+      }
+
+      function mdSafeUrl(url) {
+        const u = String(url || "").trim();
+        return /^(https?:|mailto:)/i.test(u) ? u : null;
+      }
+
+      const RE_LIST_ITEM = /^(\s*)([-*+]|\d{1,9}[.)])(\s+)(.*)$/;
+      const RE_HEADING = /^\s{0,3}(#{1,6})\s+(.*?)\s*#*\s*$/;
+      const RE_FENCE = /^(\s*)(`{3,}|~{3,})\s*([^`]*)$/;
+      const RE_HR = /^\s{0,3}([-*_])(?:\s*\1){2,}\s*$/;
+      const RE_QUOTE = /^\s{0,3}>/;
+      const RE_TABLE_SEP = /^\s*\|?\s*:?-{1,}:?\s*(\|\s*:?-{1,}:?\s*)*\|?\s*$/;
+
+      function listItemMatch(line) {
+        const m = RE_LIST_ITEM.exec(line);
+        if (!m) return null;
+        const indent = m[1].replace(/\t/g, "  ").length;
+        return { indent, marker: m[2], ordered: /\d/.test(m[2]), content: m[4] };
+      }
+
+      function isBlockInterrupt(line, next) {
+        if (line == null || /^\s*$/.test(line)) return true;
+        if (RE_HEADING.test(line)) return true;
+        if (RE_FENCE.test(line)) return true;
+        if (RE_HR.test(line)) return true;
+        if (RE_QUOTE.test(line)) return true;
+        if (RE_LIST_ITEM.test(line)) return true;
+        if (line.includes("|") && next && RE_TABLE_SEP.test(next)) return true;
+        return false;
+      }
+
+      // Inline pass: append formatted nodes for `text` into `parent`.
+      function renderInline(parent, text) {
+        const str = String(text);
+        const len = str.length;
+        let i = 0;
+        let buf = "";
+        const flush = () => {
+          if (buf) { parent.appendChild(document.createTextNode(buf)); buf = ""; }
+        };
+
+        while (i < len) {
+          const ch = str[i];
+
+          if (ch === "\\" && i + 1 < len) { buf += str[i + 1]; i += 2; continue; }
+
+          if (ch === "`") {
+            const m = /^(`+)([\s\S]*?)\1(?!`)/.exec(str.slice(i));
+            if (m) {
+              flush();
+              const code = mdEl("code");
+              code.textContent = m[2].replace(/^ (.*) $/, "$1");
+              parent.appendChild(code);
+              i += m[0].length;
+              continue;
+            }
+          }
+
+          if (ch === "[") {
+            const m = /^\[((?:\\.|[^\]])*)\]\(\s*(<[^>]*>|[^)\s]+)(?:\s+"[^"]*")?\s*\)/.exec(str.slice(i));
+            if (m) {
+              const href = mdSafeUrl(m[2].replace(/^<|>$/g, ""));
+              flush();
+              if (href) {
+                const a = mdEl("a");
+                a.href = href;
+                a.target = "_blank";
+                a.rel = "noopener noreferrer";
+                renderInline(a, m[1]);
+                parent.appendChild(a);
+              } else {
+                renderInline(parent, m[1]);
+              }
+              i += m[0].length;
+              continue;
+            }
+          }
+
+          if ((ch === "*" || ch === "_") && str.slice(i, i + 2) === ch + ch) {
+            const close = str.indexOf(ch + ch, i + 2);
+            if (close > i + 2) {
+              flush();
+              const strong = mdEl("strong");
+              renderInline(strong, str.slice(i + 2, close));
+              parent.appendChild(strong);
+              i = close + 2;
+              continue;
+            }
+          }
+
+          if (ch === "~" && str[i + 1] === "~") {
+            const close = str.indexOf("~~", i + 2);
+            if (close > i + 2) {
+              flush();
+              const del = mdEl("del");
+              renderInline(del, str.slice(i + 2, close));
+              parent.appendChild(del);
+              i = close + 2;
+              continue;
+            }
+          }
+
+          if (ch === "*" || ch === "_") {
+            // `_` emphasis is honoured only at word boundaries so identifiers
+            // like snake_case and __init__ survive intact; `*` is unrestricted.
+            const isUnderscore = ch === "_";
+            const prev = i > 0 ? str[i - 1] : " ";
+            if (!isUnderscore || /[\s([{"'~*]/.test(prev)) {
+              let j = i + 1;
+              let close = -1;
+              while (j < len) {
+                if (str[j] === "\\") { j += 2; continue; }
+                if (str[j] === ch && str[j - 1] !== ch && str[j + 1] !== ch) {
+                  const nxt = j + 1 < len ? str[j + 1] : " ";
+                  if (!isUnderscore || /[\s)\]}.,!?;:"'~*]/.test(nxt)) { close = j; break; }
+                }
+                j++;
+              }
+              if (close > i + 1) {
+                flush();
+                const em = mdEl("em");
+                renderInline(em, str.slice(i + 1, close));
+                parent.appendChild(em);
+                i = close + 1;
+                continue;
+              }
+            }
+          }
+
+          buf += ch;
+          i++;
+        }
+        flush();
+      }
+
+      function dedentLines(lines) {
+        let min = Infinity;
+        for (const l of lines) {
+          if (/^\s*$/.test(l)) continue;
+          const n = l.length - l.replace(/^\s+/, "").length;
+          if (n < min) min = n;
+        }
+        if (!isFinite(min) || min === 0) return lines.slice();
+        return lines.map(l => (/^\s*$/.test(l) ? l : l.slice(min)));
+      }
+
+      // Consumes one list item (its inline text plus any more-indented
+      // continuation/nested block lines) and returns the next line index.
+      // Nested lists and multi-paragraph items fall out of the recursive
+      // renderMarkdownInto on the dedented child block.
+      function appendListItem(lines, start, listEl) {
+        const first = listItemMatch(lines[start]);
+        const baseIndent = first.indent;
+        const li = mdEl("li");
+        let content = first.content;
+
+        const task = /^\[([ xX])\]\s+(.*)$/.exec(content);
+        // A task <li> is a flex row [checkbox | body]; its text and any nested
+        // blocks stack inside the body column so a sub-list indents *below* the
+        // text rather than becoming a third flex column beside it. A plain <li>
+        // hosts its inline text directly so `li::marker` still draws the bullet.
+        let textHost = li;
+        let childHost = li;
+        if (task) {
+          li.classList.add("md-task");
+          const checked = /[xX]/.test(task[1]);
+          const box = mdEl("span", "md-check" + (checked ? " done" : ""));
+          box.setAttribute("aria-hidden", "true");
+          if (checked) box.textContent = "✓";
+          li.appendChild(box);
+          const body = mdEl("div", "md-li-body");
+          li.appendChild(body);
+          textHost = mdEl("span", "md-li-text");
+          body.appendChild(textHost);
+          childHost = body;
+          content = task[2];
+        }
+        renderInline(textHost, content);
+
+        let i = start + 1;
+        const childLines = [];
+        while (i < lines.length) {
+          if (/^\s*$/.test(lines[i])) {
+            // A blank line stays with this item only when more-indented
+            // content follows (loose list / multi-paragraph item).
+            let k = i + 1;
+            while (k < lines.length && /^\s*$/.test(lines[k])) k++;
+            const follow = k < lines.length ? lines[k] : null;
+            const followIndent = follow ? follow.length - follow.replace(/^\s+/, "").length : 0;
+            if (follow && followIndent > baseIndent) { childLines.push(""); i++; continue; }
+            break;
+          }
+          const m = listItemMatch(lines[i]);
+          const indent = lines[i].length - lines[i].replace(/^\s+/, "").length;
+          if (m && m.indent <= baseIndent) break;      // sibling or outer item
+          if (indent <= baseIndent) break;             // dedented plain line
+          childLines.push(lines[i]);                   // nested / continuation
+          i++;
+        }
+
+        if (childLines.length) {
+          renderMarkdownInto(childHost, dedentLines(childLines).join("\n"), true);
+        }
+
+        listEl.appendChild(li);
+        return i;
+      }
+
+      function parseList(lines, start, parent) {
+        const first = listItemMatch(lines[start]);
+        const ordered = first.ordered;
+        const baseIndent = first.indent;
+        const listEl = mdEl(ordered ? "ol" : "ul", "md-list");
+        if (ordered) {
+          const n = parseInt(first.marker, 10);
+          if (n > 1) listEl.setAttribute("start", String(n));
+        }
+        let i = start;
+        while (i < lines.length) {
+          if (/^\s*$/.test(lines[i])) {
+            let k = i + 1;
+            while (k < lines.length && /^\s*$/.test(lines[k])) k++;
+            const nm = k < lines.length ? listItemMatch(lines[k]) : null;
+            if (nm && nm.indent >= baseIndent) { i = k; continue; }
+            break;
+          }
+          const m = listItemMatch(lines[i]);
+          // Siblings at baseIndent extend the list; anything shallower ends it.
+          // Deeper items were already swallowed by the previous item's child
+          // block, so they never surface here.
+          if (!m || m.indent !== baseIndent) break;
+          i = appendListItem(lines, i, listEl);
+        }
+        parent.appendChild(listEl);
+        return i;
+      }
+
+      function parseTable(lines, start, parent) {
+        const splitRow = row => {
+          let s = row.trim();
+          s = s.replace(/^\|/, "").replace(/\|$/, "");
+          const cells = [];
+          let cur = "";
+          for (let i = 0; i < s.length; i++) {
+            if (s[i] === "\\" && i + 1 < s.length) { cur += s[i] + s[i + 1]; i++; continue; }
+            if (s[i] === "|") { cells.push(cur); cur = ""; continue; }
+            cur += s[i];
+          }
+          cells.push(cur);
+          return cells.map(c => c.trim());
+        };
+
+        const headers = splitRow(lines[start]);
+        const aligns = splitRow(lines[start + 1]).map(spec => {
+          const l = spec.startsWith(":");
+          const r = spec.endsWith(":");
+          return l && r ? "center" : r ? "right" : l ? "left" : "";
+        });
+
+        const wrap = mdEl("div", "md-table-wrap");
+        const table = mdEl("table");
+        const thead = mdEl("thead");
+        const htr = mdEl("tr");
+        headers.forEach((h, idx) => {
+          const th = mdEl("th");
+          if (aligns[idx]) th.style.textAlign = aligns[idx];
+          renderInline(th, h);
+          htr.appendChild(th);
+        });
+        thead.appendChild(htr);
+        table.appendChild(thead);
+
+        const tbody = mdEl("tbody");
+        let i = start + 2;
+        while (i < lines.length && lines[i].includes("|") && !/^\s*$/.test(lines[i])) {
+          const cells = splitRow(lines[i]);
+          const tr = mdEl("tr");
+          for (let c = 0; c < headers.length; c++) {
+            const td = mdEl("td");
+            if (aligns[c]) td.style.textAlign = aligns[c];
+            renderInline(td, cells[c] || "");
+            tr.appendChild(td);
+          }
+          tbody.appendChild(tr);
+          i++;
+        }
+        table.appendChild(tbody);
+        wrap.appendChild(table);
+        parent.appendChild(wrap);
+        return i;
+      }
+
+      // Block pass. `nested` is set when rendering list-item children so a
+      // heading inside a list doesn't grow a giant top margin.
+      function renderMarkdownInto(container, markdown, nested) {
+        if (!nested) container.textContent = "";
+        const lines = String(markdown == null ? "" : markdown)
+          .replace(/\r\n?/g, "\n")
+          .split("\n");
+        let i = 0;
+
+        while (i < lines.length) {
+          const line = lines[i];
+
+          if (/^\s*$/.test(line)) { i++; continue; }
+
+          const fence = RE_FENCE.exec(line);
+          if (fence) {
+            const marker = fence[2][0];
+            const fenceLen = fence[2].length;
+            const lang = fence[3].trim();
+            const closer = new RegExp("^\\s*\\" + marker + "{" + fenceLen + ",}\\s*$");
+            i++;
+            const code = [];
+            while (i < lines.length && !closer.test(lines[i])) { code.push(lines[i]); i++; }
+            if (i < lines.length) i++; // consume closing fence
+            const pre = mdEl("pre", "md-pre");
+            if (lang) pre.setAttribute("data-lang", lang.split(/\s+/)[0]);
+            const codeEl = mdEl("code");
+            codeEl.textContent = code.join("\n");
+            pre.appendChild(codeEl);
+            container.appendChild(pre);
+            continue;
+          }
+
+          const heading = RE_HEADING.exec(line);
+          if (heading) {
+            const h = mdEl("h" + heading[1].length);
+            renderInline(h, heading[2]);
+            container.appendChild(h);
+            i++;
+            continue;
+          }
+
+          if (RE_HR.test(line)) { container.appendChild(mdEl("hr")); i++; continue; }
+
+          if (RE_QUOTE.test(line)) {
+            const quote = [];
+            while (i < lines.length && RE_QUOTE.test(lines[i])) {
+              quote.push(lines[i].replace(/^\s{0,3}>\s?/, ""));
+              i++;
+            }
+            const bq = mdEl("blockquote");
+            renderMarkdownInto(bq, quote.join("\n"), true);
+            container.appendChild(bq);
+            continue;
+          }
+
+          if (line.includes("|") && i + 1 < lines.length && RE_TABLE_SEP.test(lines[i + 1])) {
+            i = parseTable(lines, i, container);
+            continue;
+          }
+
+          if (RE_LIST_ITEM.test(line)) {
+            i = parseList(lines, i, container);
+            continue;
+          }
+
+          const para = [];
+          while (i < lines.length && !isBlockInterrupt(lines[i], lines[i + 1])) {
+            para.push(lines[i]);
+            i++;
+          }
+          const p = mdEl("p");
+          para.forEach((pl, idx) => {
+            const hard = /( {2,}|\\)$/.test(pl);
+            renderInline(p, pl.replace(/( {2,}|\\)\s*$/, ""));
+            if (idx < para.length - 1) {
+              p.appendChild(hard ? mdEl("br") : document.createTextNode(" "));
+            }
+          });
+          container.appendChild(p);
+        }
       }
 
       // --- stall / narrative --------------------------------------------------
@@ -1659,8 +2702,12 @@
         const kind = cap.kind === "skill" ? "skill" : "mcp";
         const chip = document.createElement("span");
         chip.className = `file-chip cap-chip cap-${kind}`;
-        const glyph = CAP_GLYPH[kind] || "";
-        chip.textContent = `${glyph} ${cap.name}`.trim();
+        if (kind === "mcp") {
+          chip.insertAdjacentHTML("afterbegin", MCP_ICON);
+          chip.append(document.createTextNode(cap.name));
+        } else {
+          chip.textContent = `${CAP_GLYPH[kind] || ""} ${cap.name}`.trim();
+        }
         chip.title = `${kind}: ${cap.name}`;
         return chip;
       }
@@ -1725,6 +2772,50 @@
 
       // --- plan rail --------------------------------------------------------
 
+      // Structured outline for the rail: headings become sections, list items
+      // (with task state + nesting depth) hang under them. Prose and code are
+      // skipped — the rail is a scannable table of contents, the modal is the
+      // full read.
+      function railOutline(markdown) {
+        const out = [];
+        const lines = String(markdown || "").replace(/\r\n?/g, "\n").split("\n");
+        let inFence = false;
+        for (const raw of lines) {
+          if (/^\s*(`{3,}|~{3,})/.test(raw)) { inFence = !inFence; continue; }
+          if (inFence) continue;
+          const h = /^\s{0,3}(#{1,6})\s+(.*?)\s*#*\s*$/.exec(raw);
+          if (h) {
+            out.push({ type: "heading", level: h[1].length, text: stripInlineMd(h[2]).trim() });
+            continue;
+          }
+          const li = /^(\s*)([-*+]|\d{1,9}[.)])\s+(.*)$/.exec(raw);
+          if (li) {
+            const indent = li[1].replace(/\t/g, "  ").length;
+            let text = li[3];
+            let checked = null;
+            const task = /^\[([ xX])\]\s+(.*)$/.exec(text);
+            if (task) { checked = /[xX]/.test(task[1]); text = task[2]; }
+            text = stripInlineMd(text).trim();
+            if (text) out.push({ type: "item", depth: Math.min(2, Math.floor(indent / 2)), text, checked });
+          }
+        }
+        return out;
+      }
+
+      function buildRailOpenButton() {
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "rail-open";
+        btn.innerHTML =
+          '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 2.5H3.2a.7.7 0 0 0-.7.7V13a.7.7 0 0 0 .7.7h9.6a.7.7 0 0 0 .7-.7v-2.8"></path><path d="M9.5 2.5H13.5V6.5"></path><path d="M13 3 7.5 8.5"></path></svg>';
+        btn.append(document.createTextNode("Open full plan"));
+        btn.addEventListener("click", event => {
+          event.stopPropagation();
+          openPlanModal();
+        });
+        return btn;
+      }
+
       function renderRail(session) {
         const plan = currentPlan(session);
         const narrow = window.innerWidth < 900;
@@ -1745,6 +2836,9 @@
         els.railToggle.setAttribute("aria-expanded", String(!collapsed));
 
         els.railBody.innerHTML = "";
+        // The whole peek opens the full plan modal (§33); the expand button in
+        // the head is the explicit affordance, but the rows invite the click.
+        els.railBody.classList.toggle("clickable", Boolean(plan.doc));
         const steps = plan.steps || [];
         if (steps.length) {
           steps.forEach((step, i) => {
@@ -1764,24 +2858,176 @@
             els.railBody.append(row);
           });
         } else if (plan.doc) {
-          extractDocLines(plan.doc).slice(0, 12).forEach(text => {
-            const row = document.createElement("div");
-            row.className = "rail-row";
-            const dot = document.createElement("span");
-            dot.className = "rail-dot pending";
-            const subject = document.createElement("span");
-            subject.className = "rail-subject";
-            subject.textContent = text;
-            row.append(dot, subject);
-            els.railBody.append(row);
+          const outline = railOutline(plan.doc).slice(0, 80);
+          const container = document.createElement("div");
+          container.className = "rail-outline";
+          outline.forEach(node => {
+            if (node.type === "heading") {
+              const row = document.createElement("div");
+              row.className = "rail-sec" + (node.level === 1 ? " title" : node.level >= 3 ? " sub" : "");
+              const text = document.createElement("span");
+              text.className = "rail-sec-text";
+              text.textContent = node.text;
+              row.append(text);
+              container.append(row);
+            } else {
+              const row = document.createElement("div");
+              row.className = `rail-item depth${node.depth}`;
+              if (node.checked !== null) {
+                const box = document.createElement("span");
+                box.className = "rail-check" + (node.checked ? " done" : "");
+                box.setAttribute("aria-hidden", "true");
+                if (node.checked) box.textContent = "✓";
+                row.append(box);
+              } else {
+                const bullet = document.createElement("span");
+                bullet.className = "rail-bullet";
+                row.append(bullet);
+              }
+              const text = document.createElement("span");
+              text.className = "rail-item-text" + (node.checked ? " done" : "");
+              text.textContent = node.text;
+              row.append(text);
+              container.append(row);
+            }
           });
+          if (!outline.length) {
+            const empty = document.createElement("div");
+            empty.className = "rail-item";
+            const text = document.createElement("span");
+            text.className = "rail-item-text";
+            text.textContent = "A plan is ready.";
+            empty.append(text);
+            container.append(empty);
+          }
+          els.railBody.append(container);
         }
+
+        // A doc always earns the explicit opener (steps mode included, when the
+        // session also has an ExitPlanMode doc behind the live tracker).
+        if (plan.doc) els.railBody.append(buildRailOpenButton());
       }
 
       els.railToggle.addEventListener("click", () => {
         const collapsed = localStorage.getItem("fleet.railCollapsed") === "1";
         localStorage.setItem("fleet.railCollapsed", collapsed ? "0" : "1");
         renderAll();
+      });
+
+      // --- plan modal (§33) -------------------------------------------------
+
+      function autoOpenEnabled() {
+        return localStorage.getItem("fleet.planAutoOpen") !== "0";
+      }
+
+      function planModalOpen() {
+        return els.planModal.classList.contains("open");
+      }
+
+      // Render steps as a checklist when a plan has structured steps but no
+      // ExitPlanMode doc (e.g. a TaskCreate/TaskUpdate-only plan).
+      function renderStepsInto(container, steps) {
+        container.textContent = "";
+        const ul = mdEl("ul", "md-list");
+        steps.forEach(step => {
+          const li = mdEl("li", "md-task");
+          const done = step.status === "done";
+          const active = step.status === "active";
+          const box = mdEl("span", "md-check" + (done ? " done" : active ? " active" : ""));
+          box.setAttribute("aria-hidden", "true");
+          if (done) box.textContent = "✓";
+          const text = mdEl("span", "md-li-text");
+          text.textContent = step.subject || "(untitled step)";
+          li.append(box, text);
+          ul.appendChild(li);
+        });
+        container.appendChild(ul);
+      }
+
+      function renderPlanModal() {
+        const sid = state.planModalSessionId;
+        const plan = sid ? state.plans.get(sid) : null;
+        const session = sid ? state.sessions.get(sid) : null;
+
+        els.planSub.textContent = session
+          ? sessionLabel(session, false)
+          : (sid ? String(sid).slice(0, 8) : "");
+
+        const on = autoOpenEnabled();
+        els.planAutoToggle.classList.toggle("on", on);
+        els.planAutoToggle.setAttribute("aria-pressed", String(on));
+
+        const doc = plan && plan.doc ? plan.doc : "";
+        if (doc) {
+          // Only re-parse when the markdown actually changed — renderAll and
+          // live plan/session broadcasts call through here constantly.
+          if (state.planModalDoc !== doc) {
+            renderMarkdownInto(els.planBody, doc);
+            state.planModalDoc = doc;
+          }
+          els.planCopy.hidden = false;
+        } else if (plan && (plan.steps || []).length) {
+          renderStepsInto(els.planBody, plan.steps);
+          state.planModalDoc = null;
+          els.planCopy.hidden = true;
+        } else {
+          els.planBody.textContent = "";
+          const empty = mdEl("p", "plan-empty");
+          empty.textContent = "No plan yet for this session.";
+          els.planBody.appendChild(empty);
+          state.planModalDoc = null;
+          els.planCopy.hidden = true;
+        }
+      }
+
+      function openPlanModal(sessionId) {
+        const sid = sessionId || (activeSession() && activeSession().id);
+        if (!sid) return;
+        state.planModalSessionId = sid;
+        state.planModalDoc = null; // force a fresh parse for the new target
+        els.planModal.classList.add("open");
+        els.planModal.setAttribute("aria-hidden", "false");
+        renderPlanModal();
+        els.planClose.focus();
+      }
+
+      function closePlanModal() {
+        state.planModalSessionId = null;
+        state.planModalDoc = null;
+        els.planModal.classList.remove("open");
+        els.planModal.setAttribute("aria-hidden", "true");
+      }
+
+      function copyPlanMarkdown() {
+        const sid = state.planModalSessionId;
+        const plan = sid ? state.plans.get(sid) : null;
+        const doc = plan && plan.doc ? plan.doc : "";
+        if (!doc || !navigator.clipboard || !navigator.clipboard.writeText) return;
+        navigator.clipboard.writeText(doc).then(() => {
+          const original = els.planCopy.textContent;
+          els.planCopy.textContent = "Copied";
+          els.planCopy.classList.add("on");
+          setTimeout(() => {
+            els.planCopy.textContent = original;
+            els.planCopy.classList.remove("on");
+          }, 1400);
+        }).catch(() => {});
+      }
+
+      els.planOpen.addEventListener("click", () => openPlanModal());
+      els.railExpand.addEventListener("click", event => {
+        event.stopPropagation();
+        openPlanModal();
+      });
+      els.railBody.addEventListener("click", () => {
+        if (currentPlan(activeSession())) openPlanModal();
+      });
+      els.planClose.addEventListener("click", closePlanModal);
+      els.planBackdrop.addEventListener("click", closePlanModal);
+      els.planCopy.addEventListener("click", copyPlanMarkdown);
+      els.planAutoToggle.addEventListener("click", () => {
+        localStorage.setItem("fleet.planAutoOpen", autoOpenEnabled() ? "0" : "1");
+        renderPlanModal();
       });
 
       // --- drawer -----------------------------------------------------------
@@ -1980,11 +3226,15 @@
 
       els.drawerClose.addEventListener("click", closeDrawer);
       document.addEventListener("keydown", event => {
-        if (event.key === "Escape" && state.drawerTarget) closeDrawer();
+        if (event.key !== "Escape") return;
+        // The plan modal sits above the drawer, so it wins the first Escape.
+        if (planModalOpen()) { closePlanModal(); return; }
+        if (state.drawerTarget) closeDrawer();
       });
       document.addEventListener("click", event => {
         if (!state.drawerTarget) return;
         if (els.drawer.contains(event.target)) return;
+        if (els.planModal.contains(event.target)) return;
         if (event.target.closest(".agent")) return;
         if (event.target.closest(".hub")) return;
         closeDrawer();
@@ -2051,6 +3301,14 @@
         (msg.plans || []).forEach(plan => {
           if (plan?.sessionId) state.plans.set(plan.sessionId, plan);
         });
+        // §33: seed seenPlanDocs from the snapshot so a page load or reconnect
+        // never re-pops the modal for a plan that already existed — only plans
+        // that arrive *after* this point count as newly created.
+        state.seenPlanDocs = new Map();
+        for (const plan of state.plans.values()) {
+          if (plan && plan.doc && plan.sessionId) state.seenPlanDocs.set(plan.sessionId, plan.doc);
+        }
+        closePlanModal();
         for (const session of state.sessions.values()) {
           state.prevTurnActive.set(session.id, Boolean(session.turnActive));
         }
@@ -2065,7 +3323,24 @@
 
       function applyFleet(msg) {
         if (msg.type === "plan" && msg.plan?.sessionId) {
-          state.plans.set(msg.plan.sessionId, msg.plan);
+          const sid = msg.plan.sessionId;
+          state.plans.set(sid, msg.plan);
+          // §33: auto-open the plan modal the first time a session's plan.doc
+          // appears or changes. plan.step updates re-broadcast the same doc, so
+          // we compare against the last doc seen and only pop on a real change.
+          const doc = msg.plan.doc || "";
+          const prevDoc = state.seenPlanDocs.get(sid) || "";
+          const docChanged = Boolean(doc) && doc !== prevDoc;
+          if (doc !== prevDoc) state.seenPlanDocs.set(sid, doc);
+          // Only steal focus for the session the user is actually watching:
+          // FOLLOW (latest) surfaces every new plan; a pinned session surfaces
+          // only its own — a background session's plan never interrupts.
+          const relevant = state.selected === FOLLOW || state.selected === sid;
+          if (docChanged && autoOpenEnabled() && relevant) {
+            openPlanModal(sid);
+          } else if (planModalOpen() && state.planModalSessionId === sid) {
+            renderPlanModal();
+          }
         }
         if (msg.type === "activity" && msg.agentId && msg.entry && drawerTargetIs("agent", msg.agentId)) {
           appendLogEntry(msg.entry);
@@ -2084,6 +3359,7 @@
           }
           state.prevTurnActive.set(msg.session.id, Boolean(msg.session.turnActive));
           if (drawerTargetIs("session", msg.session.id)) renderDrawerHeader();
+          if (planModalOpen() && state.planModalSessionId === msg.session.id) renderPlanModal();
         }
         if (msg.agent) {
           const errAt = msg.agent.lastErrorAt ? parseTime(msg.agent.lastErrorAt) : 0;
@@ -2169,6 +3445,10 @@
         const running = agents.filter(agent => agent.status === "running").length;
         els.running.textContent = `${running} running`;
         els.collisionChip.style.display = collisions.size > 0 ? "flex" : "none";
+        // §33: the top-bar Plan button is the always-visible manual opener —
+        // it survives the <900px breakpoint that hides the rail entirely.
+        const sessionPlan = session ? state.plans.get(session.id) : null;
+        els.planOpen.hidden = !(sessionPlan && (sessionPlan.doc || (sessionPlan.steps || []).length));
         els.hub.classList.toggle("active", Boolean(session?.turnActive));
         els.hub.classList.toggle("ended", Boolean(session?.ended));
         const hubTitle = state.config.hubTitle || "Orchestrator";

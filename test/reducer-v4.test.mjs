@@ -1,7 +1,7 @@
 // Reducer v4 test suite (docs/FLEETVIEW-SPEC.md §24 lineage, §25 session
 // activity, §26 capability chips). Boots the real server/server.mjs as a
 // child process against a scratch FLEET_EVENTS_FILE and a scratch HOME, on
-// port 4857 (never the live ~/.lumenade/events.jsonl or
+// port 4857 (never the live ~/.agenticade/events.jsonl or
 // ~/.claude/settings.json). Drives it by appending neutral events to the
 // events file and reading back the SSE snapshot / log endpoints over HTTP --
 // the same interface a real client uses.

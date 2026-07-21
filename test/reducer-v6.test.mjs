@@ -1,7 +1,7 @@
 // Reducer v6 test suite (docs/FLEETVIEW-SPEC.md §32.4 — Session.title). Boots
 // the real server/server.mjs as a child process against a scratch
 // FLEET_EVENTS_FILE and a scratch HOME, on port 4859 (never the live
-// ~/.lumenade/events.jsonl, never 4747 which is the binface test rig, never
+// ~/.agenticade/events.jsonl, never 4747 which is the binface test rig, never
 // 4858 which reducer-v5 holds — the suites run concurrently).
 //
 // The title path is enricher-driven, so like §31.2's model case these tests

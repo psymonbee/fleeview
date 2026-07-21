@@ -17,7 +17,7 @@ const SESSION_ID = `demo-${process.pid}`;
 const CWD = "/Users/simon/lumenADE";
 
 const EVENTS_FILE =
-  process.env.FLEET_EVENTS_FILE || `${homedir()}/.lumenade/events.jsonl`;
+  process.env.FLEET_EVENTS_FILE || `${homedir()}/.agenticade/events.jsonl`;
 
 mkdirSync(dirname(EVENTS_FILE), { recursive: true });
 
@@ -94,12 +94,42 @@ async function main() {
   await sleep(500);
 
   emit("plan.doc", {
-    markdown:
-      "## FleetView v2 rollout\n\n" +
-      "- Build SSE fleet server\n" +
-      "- Build fleet canvas UI\n" +
-      "- Wire event adapters\n" +
-      "- Ship v2 demo storyline\n",
+    markdown: [
+      "# FleetView v2 rollout",
+      "",
+      "Stand up the **live orchestration canvas** end to end: an SSE server that",
+      "reduces neutral events into fleet state, a canvas UI that paints it, and a",
+      "scripted demo that exercises the whole path.",
+      "",
+      "## Steps",
+      "",
+      "- [x] Build SSE fleet server",
+      "- [ ] Build fleet canvas UI",
+      "    - Card stack + draggable cards",
+      "    - Plan rail + `plan.doc` viewer",
+      "- [ ] Wire event adapters (`claude-code`, `codex`)",
+      "- [ ] Ship v2 demo storyline",
+      "",
+      "## Event contract",
+      "",
+      "The reducer only ever sees the neutral envelope — never a raw hook payload:",
+      "",
+      "```js",
+      "emit(\"plan.doc\", {",
+      "  markdown: planText,   // ExitPlanMode tool_input.plan",
+      "});",
+      "```",
+      "",
+      "## Surfaces",
+      "",
+      "| Surface | Source event | Notes |",
+      "| --- | --- | --- |",
+      "| Plan rail | `plan.step` | live step status |",
+      "| Plan viewer | `plan.doc` | full rendered markdown |",
+      "| Agent card | `agent.*` | one card per subagent |",
+      "",
+      "> Auto-opens the moment a plan is created — no digging through the rail.",
+    ].join("\n"),
   });
   await sleep(500);
 

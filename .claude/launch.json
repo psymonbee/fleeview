@@ -6,6 +6,36 @@
       "runtimeExecutable": "node",
       "runtimeArgs": ["server/server.mjs"],
       "port": 4747
+    },
+    {
+      "name": "fleetview-demo-scratch",
+      "runtimeExecutable": "env",
+      "runtimeArgs": ["FLEET_EVENTS_FILE=/tmp/fleet-demo.jsonl", "node", "server/server.mjs"],
+      "autoPort": true
+    },
+    {
+      "name": "fleetview-real-ro",
+      "runtimeExecutable": "env",
+      "runtimeArgs": ["PORT=4881", "node", "server/server.mjs"],
+      "port": 4881
+    },
+    {
+      "name": "agenticade-site",
+      "runtimeExecutable": "python3",
+      "runtimeArgs": ["-m", "http.server", "4780", "--directory", "/Users/simon/agenticade-site"],
+      "port": 4780
+    },
+    {
+      "name": "workmate-api",
+      "runtimeExecutable": "env",
+      "runtimeArgs": ["API_PORT=3001", "npm", "--prefix", "/Users/simon/workmate", "run", "dev:api"],
+      "port": 3001
+    },
+    {
+      "name": "workmate-demo",
+      "runtimeExecutable": "env",
+      "runtimeArgs": ["API_PORT=3001", "npm", "--prefix", "/Users/simon/workmate", "run", "dev:web", "--", "--port", "5183", "--strictPort"],
+      "port": 5183
     }
   ]
 }

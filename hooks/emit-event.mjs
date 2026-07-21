@@ -68,7 +68,7 @@ async function main() {
   // homedir() (not process.env.HOME) resolves correctly on Windows too, where
   // HOME is unset and the home path lives in USERPROFILE.
   const eventsFile =
-    process.env.FLEET_EVENTS_FILE || join(homedir(), ".lumenade", "events.jsonl");
+    process.env.FLEET_EVENTS_FILE || join(homedir(), ".agenticade", "events.jsonl");
 
   mkdirSync(dirname(eventsFile), { recursive: true });
   appendFileSync(eventsFile, lines);

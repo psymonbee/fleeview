@@ -199,7 +199,7 @@
 
       <div class="station" style="--accent: var(--teal)">
         <p class="tag">Station 3 · The diary</p>
-        <h3>One plain text file: <span class="file">~/.lumenade/events.jsonl</span></h3>
+        <h3>One plain text file: <span class="file">~/.agenticade/events.jsonl</span></h3>
         <p>Every translated event becomes one line in this file — a running diary of everything your agents have done. It's the only thing connecting the two halves of the system, and you can open it in any text editor. Delete it and FleetView simply starts a fresh diary.</p>
       </div>
       <div class="wire"><span class="line"></span><span class="label">read continuously, like a ticker tape</span></div>
@@ -263,7 +263,7 @@
         <tr><td><span class="file">adapters/codex.mjs</span></td><td>The second translator (new in v3): OpenAI Codex's dialect in, same universal language out. Every Codex name gets a "codex:" prefix so the two tools can never be confused on screen.</td></tr>
         <tr><td><span class="file">server/enrich.mjs</span></td><td>The accountant (new in v3): quietly reads each agent's own session transcript on your Mac, adds up the tokens it has spent, and prices them. Nothing ever leaves your machine.</td></tr>
         <tr><td><span class="file">bin/install.mjs</span></td><td>The mover-in (new in v3): one command sets FleetView up on any Mac — copies the app to a stable home, wires the hooks in (with a backup first), and can undo itself with --uninstall.</td></tr>
-        <tr><td><span class="file">~/.lumenade/events.jsonl</span></td><td>The diary (lives in your home folder, not the repo). One line per event. The whole system's single source of truth.</td></tr>
+        <tr><td><span class="file">~/.agenticade/events.jsonl</span></td><td>The diary (lives in your home folder, not the repo). One line per event. The whole system's single source of truth.</td></tr>
         <tr><td><span class="file">server/server.mjs</span></td><td>The newsroom: reads the diary, keeps the current picture, broadcasts changes, and serves the web page.</td></tr>
         <tr><td><span class="file">server/narrator.mjs</span></td><td>The optional commentator. Off unless you flip it on in the config.</td></tr>
         <tr><td><span class="file">public/index.html</span></td><td>The screen — one self-contained page, no internet access needed or used.</td></tr>
@@ -285,7 +285,7 @@
     <p style="margin-top:18px"><strong>To see a full show without real agents:</strong> run the rehearsal tape in a second terminal — plan steps, a failure, a stall, a file collision, the lot, in about a minute.</p>
     <p class="kbd-line">npm run demo <span class="c">(add</span> -- --fast <span class="c">to skip the waits)</span></p>
     <p style="margin-top:18px"><strong>To switch it all off:</strong> two moves, fully reversible — remove the hooks block from <span class="file">~/.claude/settings.json</span> (the taps stop), and delete the diary folder:</p>
-    <p class="kbd-line">rm -rf ~/.lumenade</p>
+    <p class="kbd-line">rm -rf ~/.agenticade</p>
     <p class="muted" style="margin-top:18px">The config dial lives in <span class="file">fleet.config.json</span> — rename an agent, change what counts as "stalled", tweak the token price list, or set <span class="file">narration.enabled</span> to true to hear the commentator.</p>
     <p style="margin-top:18px"><strong>To set it up on another Mac</strong> (new in v3, once the repo is public): one command does the whole move-in, and the same command with <span class="file">--uninstall</span> undoes it.</p>
     <p class="kbd-line">npx github:psymonbee/fleeview</p>

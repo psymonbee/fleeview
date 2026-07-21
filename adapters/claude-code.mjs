@@ -149,7 +149,10 @@ function translatePreToolUse(payload, base) {
 
   if (toolName === "ExitPlanMode") {
     if (typeof input.plan !== "string") return [];
-    return [{ ...base, kind: "plan.doc", markdown: truncate(input.plan, 4000) }];
+    // 20k (was 4k): the plan.doc now drives a full rendered plan view (§33),
+    // so clipping a realistic plan-mode doc at 4k is user-visible. Plans are
+    // infrequent, so the larger cap costs little in the events stream.
+    return [{ ...base, kind: "plan.doc", markdown: truncate(input.plan, 20000) }];
   }
 
   // §25: TaskCreate stays excluded (its Pre side is unmapped, see §9) — every
