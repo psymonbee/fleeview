@@ -20,6 +20,12 @@
       "port": 4881
     },
     {
+      "name": "agenticade-site",
+      "runtimeExecutable": "python3",
+      "runtimeArgs": ["-m", "http.server", "4780", "--directory", "/Users/simon/agenticade-site"],
+      "port": 4780
+    },
+    {
       "name": "workmate-api",
       "runtimeExecutable": "env",
       "runtimeArgs": ["API_PORT=3001", "npm", "--prefix", "/Users/simon/workmate", "run", "dev:api"],
